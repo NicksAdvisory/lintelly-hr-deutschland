@@ -23,6 +23,7 @@ nr,verzeichnis,status,datum,link,update_weg
 ,xAI / Grok,Nick: Test-Haken und Absenden,2026-10-23,https://x.ai/bot/marketplace/submit-a-plugin,Formular
 25,Glama,Nick: Login und Server hinzufügen,,https://glama.ai/mcp/servers,automatisch (Crawl des Repos)
 2,Anthropic Connectors Directory,eingereicht (Prüfung einige Wochen),2026-10-25,https://claude.ai/directory/manage,Portal (Tools werden live vom Server gelesen)
+2b,Anthropic Plugin-Verzeichnis,eingereicht (Sicherheits-Scan läuft),2026-10-25,https://claude.ai/directory/manage,automatisch aus main (Prüfung alle 6 Stunden, Auto-Publish an)
 5,GitHub MCP Registry,Nick entscheidet (Kommentar fertig),,https://github.com/github/github-mcp-server/discussions/1257,automatisch aus MCP Registry nach Aufnahme
 3,OpenAI Apps,Nick: Firmenverifizierung und Domain,,https://platform.openai.com/apps-manage,Portal
 45,awesome-claude-code,Nick (nur Menschen),,https://github.com/hesreallyhim/awesome-claude-code,Formular
