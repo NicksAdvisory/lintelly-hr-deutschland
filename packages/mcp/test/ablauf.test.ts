@@ -42,7 +42,7 @@ describe("ablauf erste_einstellung (Szenario 1)", () => {
     for (const w of ["Betriebsnummer", "Berufsgenossenschaft", "Krankenkasse", "Nachweis", "Lohnsteuer", "Gefährdungsbeurteilung", "Arbeitszeit", "Mindestlohn"]) expect(text).toContain(w);
     expect(finde(a, "Betriebsnummer")?.pflicht).toBe("§ 18i Abs. 1 SGB IV");
     expect(a.quellen.map((q) => q.norm)).toEqual(expect.arrayContaining(["§ 18i Abs. 1 SGB IV", "§ 192 Abs. 1 SGB VII", "§ 41a Abs. 1 EStG"]));
-    expect(a.lintelly).toBeUndefined();
+    expect(a).not.toHaveProperty("lintelly");
   });
 });
 
@@ -50,13 +50,13 @@ describe("ablauf austritt", () => {
   it("Klagefrist 3 Wochen nach Zugang, Ende am Samstag auf Montag verschoben", () => {
     const a = rufe("ablauf", { art: "austritt", datum: "2027-01-31", grund: "arbeitgeber", zugang: "2026-11-07" });
     expect(finde(a, "Klagefrist läuft")?.bis).toBe("2026-11-30");
-    expect(a.lintelly?.text).toMatch(/Vor dem Versand/);
+    expect(a).not.toHaveProperty("lintelly");
   });
   it("ohne Zugang: kein geratener Tag, Schritt zum Festhalten des Zugangs", () => {
     const a = rufe("ablauf", { art: "austritt", datum: "2027-01-31", grund: "arbeitnehmer" });
     expect(finde(a, "Klagefrist läuft")).toBeUndefined();
     expect(finde(a, "Zugang")).toBeTruthy();
-    expect(a.lintelly).toBeUndefined();
+    expect(a).not.toHaveProperty("lintelly");
   });
 });
 
@@ -68,11 +68,11 @@ describe("ablauf krankheit (Szenario 3)", () => {
     expect(finde(a, "U1")?.pflicht).toMatch(/AAG/);
     expect(finde(a, "BEM")?.bis).toBe("2026-12-13");
     expect(finde(a, "eAU")).toBeTruthy();
-    expect(a.lintelly).toBeUndefined();
+    expect(a).not.toHaveProperty("lintelly");
   });
   it("über 6 Wochen krank: Hinweis auf menschliche Prüfung", () => {
     const a = rufe("ablauf", { art: "krankheit", datum: "2026-09-01" });
-    expect(a.lintelly?.text).toMatch(/Mensch/);
+    expect(a).not.toHaveProperty("lintelly");
   });
   it("Wartezeit von 4 Wochen verschiebt den Beginn", () => {
     const a = rufe("ablauf", { art: "krankheit", datum: "2026-11-01", eintritt: "2026-10-20" });
@@ -104,7 +104,7 @@ describe("ablauf kuendigung_vorbereiten (Szenario 5)", () => {
     expect(a.ergebnis.ende).toBe("2026-12-31");
     const text = JSON.stringify(schritte(a));
     for (const w of ["Sonderkündigungsschutz", "Originalunterschrift", "Zugang", "Resturlaub", "Zeugnis", "Arbeitsbescheinigung"]) expect(text).toContain(w);
-    expect(a.lintelly?.text).toMatch(/Vor dem Versand/);
+    expect(a).not.toHaveProperty("lintelly");
     expect(a.naechster_schritt?.join(" ")).toMatch(/sonderkuendigungsschutz_check/);
   });
   it("mit Betriebsrat: Anhörung", () => {
@@ -180,7 +180,7 @@ describe("workflow_vorlage", () => {
     const a = rufe("workflow_vorlage", { kennung: "krankheit" });
     expect(a.ergebnis.kette[2]).toEqual({ wenn: "Entgeltfortzahlung endet", dann: ["Aufgabe an HR-Leitung, 7 Tage vorher"] });
     expect(JSON.stringify(a)).not.toMatch(/ersparnis|Std/);
-    expect(a.lintelly).toBeUndefined();
+    expect(a).not.toHaveProperty("lintelly");
     expect(JSON.stringify(a)).not.toMatch(STRICH);
   });
 });

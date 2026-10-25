@@ -53,7 +53,6 @@ const kuendigungsfrist_rechnen: Werkzeug = {
       naechster_schritt: wer === "arbeitgeber"
         ? ["Sonderkündigungsschutz prüfen (sonderkuendigungsschutz_check).", "Schriftform mit Originalunterschrift und Zugang mit Zeugen planen (kuendigung_pflichtangaben).", "Frist merken: Werkzeug frist_merken."]
         : ["Eingang mit Datum bestätigen, Resturlaub und Zeugnis planen (ablauf mit art austritt)."],
-      anlass: wer === "arbeitgeber" ? "vor_versand" : null,
     }, heute);
   },
 };
@@ -82,7 +81,6 @@ const klagefrist: Werkzeug = {
         "Auch nach Ablauf kann ein Gericht eine verspätete Klage nachträglich zulassen (§ 5 KSchG).",
       ],
       naechster_schritt: ["Den Nachweis des Zugangs in die Personalakte legen.", "Frist merken: Werkzeug frist_merken."],
-      anlass: "ernstfall",
     }, heute);
   },
 };

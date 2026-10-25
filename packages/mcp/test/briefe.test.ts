@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { WERTE } from "@/lib/regeln/werte";
 // Die Rechnung der Seite (lintelly.com, components/tools/kuendigungsschreiben-generator.tsx importiert sie aus lib/fristen)
 import { berechneKuendigung } from "../../kern/website/lib/fristen";
-import { ANLASS } from "../src/antwort";
+import { HINWEIS } from "../src/antwort";
 import { WERKZEUGE } from "../src/werkzeuge";
 import { rufe } from "./hilfe";
 
@@ -101,7 +101,8 @@ describe("kuendigungsschreiben", () => {
     const a = rufe("kuendigungsschreiben", basis);
     expect(a.quellen).toContainEqual(expect.objectContaining({ norm: "§ 623 BGB", url: "https://www.gesetze-im-internet.de/bgb/__623.html" }));
     expect(a.quellen.map((q) => q.norm)).toEqual(expect.arrayContaining(["§ 622 Abs. 2 BGB", "§ 174 BGB", "§ 4 Satz 1 KSchG", "§ 38 Abs. 1 SGB III"]));
-    expect(a.lintelly?.text).toBe(ANLASS.vor_versand);
+    expect(a).not.toHaveProperty("lintelly");
+    expect(a.hinweis).toBe(HINWEIS);
     expect(JSON.stringify(a)).not.toMatch(STRICH);
     expect(JSON.stringify(rufe("kuendigungsschreiben", { ...basis, anrede: "du", freistellung: "unwiderruflich" }))).not.toMatch(STRICH);
   });
@@ -164,7 +165,8 @@ describe("abmahnung", () => {
     const a = rufe("abmahnung", basis);
     expect(a.quellen.map((q) => q.norm)).toEqual(expect.arrayContaining(["§ 314 Abs. 2 BGB", "§ 626 Abs. 2 BGB", "§ 83 BetrVG", "§ 5 EFZG"]));
     expect(a.quellen.find((q) => q.norm === "§ 626 Abs. 2 BGB")).toHaveProperty("status"); // aus dem Register, mit Prüfstand
-    expect(a.lintelly?.text).toBe(ANLASS.vor_versand);
+    expect(a).not.toHaveProperty("lintelly");
+    expect(a.hinweis).toBe(HINWEIS);
     for (const v of ["Unpünktlichkeit", "Unentschuldigtes Fehlen", "Verspätete Krankmeldung oder fehlende AU-Bescheinigung", "Arbeitsverweigerung",
       "Verstoß gegen eine Anweisung", "Verhalten gegenüber Kollegen oder Kunden", "Sonstiges"])
       for (const anrede of ["sie", "du"]) expect(JSON.stringify(rufe("abmahnung", { verstoss: v, datum_vorfall: "2026-09-15", anrede, fruehere_abmahnung: "gleich" }))).not.toMatch(STRICH);
@@ -217,7 +219,8 @@ describe("kuendigung_pflichtangaben", () => {
   it("Quellen aus dem Register, Band Firmengröße, Hinweis vor dem Versand, kein Gedankenstrich, unbekanntes Feld abgelehnt", () => {
     const a = rufe("kuendigung_pflichtangaben", { beschaeftigte: 7, betriebsrat: true });
     expect(a.quellen.map((q) => q.norm)).toEqual(expect.arrayContaining(["§ 623 BGB", "§ 23 Abs. 1 KSchG", "§ 4 Satz 1 KSchG", "§ 102 BetrVG", "§ 109 GewO"]));
-    expect(a.lintelly?.text).toBe(ANLASS.vor_versand);
+    expect(a).not.toHaveProperty("lintelly");
+    expect(a.hinweis).toBe(HINWEIS);
     expect(JSON.stringify(a)).not.toMatch(STRICH);
     expect(JSON.stringify(rufe("kuendigung_pflichtangaben", { beschaeftigte: 15 }))).not.toMatch(STRICH);
     expect(() => rufe("kuendigung_pflichtangaben", { beschaeftigte: 7, name: "Max" })).toThrow("Unbekanntes Feld: name");

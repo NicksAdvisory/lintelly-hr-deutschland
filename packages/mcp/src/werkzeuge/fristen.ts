@@ -97,7 +97,6 @@ const probezeit: Werkzeug = {
         `Probezeitgespräch bis ${fmt(r.gespraech)} führen, Entscheidung bis ${fmt(r.entscheidung)} treffen.`,
         merken("Ende der Probezeit", toYmd(r.ende)),
       ] : [],
-      anlass: (e.beschaeftigte ?? 0) >= 10 ? "wachstum" : null,
     }, heute);
   },
 };

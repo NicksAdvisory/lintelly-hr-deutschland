@@ -121,7 +121,7 @@ const kuendigungsschreiben: Werkzeug = {
     const vm = k.vertragsfrist_monate ?? 3;
     const vertrag = k.vertragsfrist ?? "keine";
     const freistellung = k.freistellung ?? "keine";
-    const fehler = (text: string) => antwort({ ergebnis: { fehler: text }, anlass: "vor_versand" }, heute);
+    const fehler = (text: string) => antwort({ ergebnis: { fehler: text } }, heute);
     if (!Number.isInteger(pz)) return fehler("Probezeit in ganzen Monaten angeben, 0 bis 12.");
     if (!Number.isInteger(vm)) return fehler("Vertragliche Frist in ganzen Monaten angeben, 1 bis 12.");
     if (isISODate(k.briefdatum) && k.zugang < k.briefdatum) return fehler("Zugang liegt vor dem Datum des Schreibens.");
@@ -138,7 +138,6 @@ const kuendigungsschreiben: Werkzeug = {
       return antwort({
         ergebnis: { brief: null, passt_nicht: "Für Ausbildungsverhältnisse passt diese Vorlage nicht. In der Probezeit kann das Ausbildungsverhältnis jederzeit ohne Frist gekündigt werden. Danach kündigt der Betrieb nur aus wichtigem Grund, schriftlich und mit Angabe der Gründe (§ 22 BBiG). Lass solche Kündigungen prüfen." },
         quellen: [normQuelle("§ 22 BBiG")],
-        anlass: "vor_versand",
       }, heute);
 
     const termin = {
@@ -164,7 +163,6 @@ const kuendigungsschreiben: Werkzeug = {
         },
         rechenweg: r.rechenweg, quellen, fallen,
         naechster_schritt: ["Betriebsrat anhören, danach das Werkzeug mit „angehört“ noch einmal aufrufen."],
-        anlass: "vor_versand",
       }, heute);
 
     const u = UNTERSCHRIFT[k.unterschrift ?? "geschaeftsfuehrung"];
@@ -179,7 +177,6 @@ const kuendigungsschreiben: Werkzeug = {
         "Ersetz die Platzhalter in eckigen Klammern, druck den Brief aus und unterschreib ihn eigenhändig.",
         `Für das Ende am ${formatDE(r.ende)} muss der Brief spätestens am ${formatDE(r.spaetesterZugang)} zugehen.`,
       ],
-      anlass: "vor_versand",
     }, heute);
   },
 };
@@ -288,7 +285,6 @@ const abmahnung: Werkzeug = {
         "Bei einer Bagatelle ohne vorherige Ermahnung kann eine Abmahnung unverhältnismäßig sein.",
       ],
       naechster_schritt: ["Frag nach den Tatsachen (was, wann, wo, wie lange, wer hat es gesehen), füll damit die Vorlage und lass die Platzhalter für Namen und Anschriften stehen, bis du sie hast."],
-      anlass: "vor_versand",
     }, heute);
   },
 };
@@ -355,7 +351,6 @@ const kuendigung_pflichtangaben: Werkzeug = {
         "Für Auszubildende nach der Probezeit gelten eigene Regeln (§ 22 BBiG).",
       ],
       naechster_schritt: ["Mit kuendigungsschreiben rechnest du das Ende aus und bekommst den Brief."],
-      anlass: "vor_versand",
     }, heute);
   },
 };

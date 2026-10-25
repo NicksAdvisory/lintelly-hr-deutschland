@@ -109,7 +109,6 @@ const schwellen_check: Werkzeug = {
           : []),
         "Prüf die Pflichten ab dem ersten Beschäftigten (ab_dem_ersten_beschaeftigten), sie gelten unabhängig von der Größe.",
       ],
-      anlass: s.koepfe >= 10 || (naechste?.r.grenze === 10 && naechste.fehlt <= 2) ? "wachstum" : null,
     }, heute);
   },
 };
@@ -188,7 +187,6 @@ const sonderkuendigungsschutz_check: Werkzeug = {
         "Übergib die Kündigung schriftlich auf Papier mit eigenhändiger Unterschrift (§ 623 BGB). E-Mail oder Scan reichen nicht.",
         "Mach den Zugang beweisbar: persönliche Übergabe mit Zeugin oder Zeuge, oder Einwurf durch einen Boten.",
       ],
-      anlass: "ernstfall",
     }, heute);
   },
 };
@@ -275,7 +273,6 @@ const bem_pflicht: Werkzeug = {
           "Prüf die Krankmeldungen einmal im Monat. Wer die Grenze überschreitet, bekommt innerhalb von zwei Wochen eine Einladung.",
           `Frist merken: Werkzeug frist_merken, Frist „Wiedervorlage BEM-Prüfung“ am ${fmtDay(wiedervorlage)}.`,
         ],
-      anlass: pflicht ? "ernstfall" : null,
     }, heute);
   },
 };

@@ -190,7 +190,6 @@ const urlaubsverfall_hinweis: Werkzeug = {
         ...(art === "jahresbeginn" && d < erinnerung ? [`Erinnerung im Kalender: ${fmt(erinnerung)}.`] : []),
         ...(b.rest > 0 && toYmd(b.ende) > heute ? [`Frist merken: Werkzeug frist_merken (Verfall des Resturlaubs, ${toYmd(b.ende)})`] : []),
       ],
-      anlass: "dokument",
     }, heute);
   },
 };

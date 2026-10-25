@@ -7,7 +7,7 @@ describe("entgeltfortzahlung", () => {
     const a = rufe("entgeltfortzahlung", { beginn: "2024-04-01", zeitraeume: [{ von: "2026-01-05", bis: "2026-03-31" }] });
     expect(a.ergebnis.faelle[0]).toMatchObject({ bezahlte_tage: 42, entgeltfortzahlung_bis: "2026-02-15", krankengeld_ab: "2026-02-16" });
     expect(a.ergebnis.letzter_tag_entgeltfortzahlung).toBe("2026-02-15");
-    expect(a.lintelly?.text).toMatch(/Mensch/);
+    expect(a).not.toHaveProperty("lintelly");
     expect(a.naechster_schritt!.join(" ")).toMatch(/U1/);
     expect(a.naechster_schritt!.join(" ")).toMatch(/Frist merken: Werkzeug frist_merken/);
     expect(a.quellen.map((q) => q.norm)).toContain("§ 3 Abs. 1 EFZG");
@@ -18,7 +18,7 @@ describe("entgeltfortzahlung", () => {
     expect(gleich.ergebnis.faelle.map((f: { bezahlte_tage: number }) => f.bezahlte_tage)).toEqual([30, 12]);
     const anders = rufe("entgeltfortzahlung", { beginn: "2024-04-01", zeitraeume: zwei });
     expect(anders.ergebnis.faelle[1].bezahlte_tage).toBe(30);
-    expect(anders.lintelly).toBeUndefined();
+    expect(anders).not.toHaveProperty("lintelly");
     expect(anders.naechster_schritt!.join(" ")).toMatch(/BEM/);
   });
   it("Wartezeit 4 Wochen ab Beginn, vorher kein Anspruch", () => {
@@ -80,7 +80,7 @@ describe("abfindung_faustformel", () => {
   it("6 volle Jahre × 0,5 × 4.000 € = 12.000 €, mit Hinweis auf menschliche Prüfung", () => {
     const a = rufe("abfindung_faustformel", { monatsgehalt_brutto: 4000, eintritt: "2020-01-01", austritt: "2025-12-31" });
     expect(a.ergebnis).toMatchObject({ gerechnete_jahre: 6, faktor: 0.5, abfindung_brutto: 12000 });
-    expect(a.lintelly?.text).toMatch(/Mensch/);
+    expect(a).not.toHaveProperty("lintelly");
   });
   it("genau 6 Monate Rest werden nicht aufgerundet, ein Tag mehr schon", () => {
     expect(rufe("abfindung_faustformel", { monatsgehalt_brutto: 4000, eintritt: "2020-01-01", austritt: "2026-06-30" }).ergebnis.gerechnete_jahre).toBe(6);

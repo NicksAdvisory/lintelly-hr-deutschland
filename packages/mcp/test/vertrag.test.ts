@@ -8,7 +8,7 @@ describe("vertragsbausteine_suchen", () => {
     const ids = a.ergebnis.treffer.map((t: { kennung: string }) => t.kennung);
     expect(ids).toEqual(expect.arrayContaining(["B3", "B4"]));
     expect(JSON.stringify(a.ergebnis)).not.toMatch(/risiko|"grün"|"gelb"|Kanzlei prüfen/);
-    expect(a.lintelly?.link).toBe("https://lintelly.com/hr");
+    expect(a).not.toHaveProperty("lintelly");
   });
   it("wer eine gesperrte Klausel sucht, bekommt Grund und sichere Alternative", () => {
     const a = rufe("vertragsbausteine_suchen", { suchtext: "Wettbewerbsverbot ohne Karenzentschädigung" });
@@ -22,7 +22,7 @@ describe("vertragsbaustein", () => {
     expect(a.ergebnis.text).toMatch(/\[Name\] kann an bis zu 2 Tagen pro Woche mobil/);
     expect(a.ergebnis.fehlende_angaben).toEqual([]);
     expect(a.ergebnis.gruppe).toBe("Tätigkeit und Ort");
-    expect(a.lintelly).toBeDefined();
+    expect(a).not.toHaveProperty("lintelly");
   });
   it("fehlt eine Pflichtangabe ohne Standard, gibt es keinen halben Text, sondern die Liste der Angaben", () => {
     const a = rufe("vertragsbaustein", { kennung: "D18" });
@@ -57,7 +57,7 @@ describe("klausel_pruefen", () => {
     const a = rufe("klausel_pruefen", { klausel: "Alle Überstunden sind mit dem Gehalt abgegolten." });
     expect(a.ergebnis.treffer[0]).toMatchObject({ kennung: "R4", grund: expect.stringMatching(/Transparenzgebot/) });
     expect(a.ergebnis.treffer[0].alternative).toMatch(/C2/);
-    expect(a.lintelly).toBeDefined();
+    expect(a).not.toHaveProperty("lintelly");
   });
   it("ohne Treffer sagt die Antwort, dass das keine Prüfung der Wirksamkeit ist", () => {
     const a = rufe("klausel_pruefen", { klausel: "Der Arbeitsort ist Frankfurt am Main." });

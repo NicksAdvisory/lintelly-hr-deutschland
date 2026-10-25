@@ -12,7 +12,7 @@ import { SOFORTMELDUNG_BEREICHE } from "@/lib/sofortmeldung";
 import type { AustrittGrund, Beschaeftigung, Person, Plan } from "@/lib/types";
 import { kette } from "@/lib/workflows/anzeige";
 import { WORKFLOWS } from "@/lib/workflows/vorlagen";
-import { antwort, normQuelle, registerQuelle, type Anlass, type Quelle } from "../antwort";
+import { antwort, normQuelle, registerQuelle, type Quelle } from "../antwort";
 import { datum, janein, schema, text, zahl, type Eingabe } from "../eingabe";
 import { LAENDER, type Werkzeug } from "../werkzeug";
 
@@ -104,7 +104,7 @@ const austrittPlan = (e: E, heute: string, stichtag: string, grund: AustrittGrun
 
 /* ---------- Die Abläufe ---------- */
 
-type Ergebnis = { daten?: Record<string, unknown>; schritte: Intern[]; fallen?: string[]; weiter: string[]; anlass?: Anlass | null };
+type Ergebnis = { daten?: Record<string, unknown>; schritte: Intern[]; fallen?: string[]; weiter: string[] };
 const merken = "Fristen merken: Werkzeug frist_merken";
 
 function eintritt(e: E, heute: string, d: string): Ergebnis {
@@ -154,7 +154,6 @@ function austritt(e: E, heute: string, d: string): Ergebnis {
       ...(["arbeitnehmer", "arbeitgeber", "aufhebung"].includes(grund) && !e.zugang ? ["Ohne den Tag des Zugangs rechnet der Ablauf keine Melde- und Klagefrist. Nie einen Tag raten."] : []),
     ],
     weiter: ["Resturlaub in Geld: urlaubsabgeltung.", "Zeugnis: arbeitszeugnis.", ...(grund === "arbeitgeber" || grund === "arbeitnehmer" ? ["Frist prüfen: kuendigungsfrist_rechnen."] : []), merken],
-    anlass: grund === "arbeitgeber" ? "vor_versand" : null,
   };
 }
 
@@ -187,7 +186,6 @@ function krankheit(e: E, heute: string, d: string): Ergebnis {
       "Gesundheitsdaten nur so weit wie nötig weitergeben, auch im Team.",
     ],
     weiter: ["Rechnung mit Fortsetzungserkrankung: entgeltfortzahlung.", "BEM im Detail: bem_pflicht.", merken],
-    anlass: heute > ende ? "ernstfall" : null,
   };
 }
 
@@ -286,7 +284,6 @@ function kuendigungVorbereiten(e: E, heute: string, zugang: string): Ergebnis {
       "Eine Kündigung trotz Sonderkündigungsschutz oder ohne Schriftform ist unwirksam und lässt sich nicht nachbessern.",
     ],
     weiter: ["Frist im Detail: kuendigungsfrist_rechnen.", "Sonderkündigungsschutz: sonderkuendigungsschutz_check.", "Schreiben: kuendigungsschreiben und kuendigung_pflichtangaben.", "Resturlaub in Geld: urlaubsabgeltung.", "Zeugnis: arbeitszeugnis.", merken],
-    anlass: "vor_versand",
   };
 }
 
@@ -417,7 +414,6 @@ const ablauf: Werkzeug = {
       quellen: x.quellen,
       fallen: [...(x.r.fallen ?? []), BIS_HINWEIS],
       naechster_schritt: x.r.weiter,
-      anlass: x.r.anlass ?? null,
     }, heute);
   },
 };

@@ -7,7 +7,7 @@ describe("kuendigungsfrist_rechnen", () => {
     expect(a.ergebnis).toMatchObject({ ende: "2027-01-31", spaetester_zugang: "2026-11-30", regel: "2 Monate zum Monatsende", norm: expect.stringMatching(/^§\s622\sAbs\.\s2\sBGB$/) });
     expect(a.fallen.join(" ")).toMatch(/Sonntag/);
     expect(a.quellen[0]).toMatchObject({ norm: "§ 622 BGB", url: "https://www.gesetze-im-internet.de/bgb/__622.html" });
-    expect(a.lintelly).toBeDefined();
+    expect(a).not.toHaveProperty("lintelly");
   });
   it("Website-Test: Grundfrist, Zugang 19.10. endet 30.11.", () => {
     expect(rufe("kuendigungsfrist_rechnen", { eintritt: "2025-06-01", zugang: "2026-10-19" }).ergebnis.ende).toBe("2026-11-30");
@@ -23,10 +23,10 @@ describe("kuendigungsfrist_rechnen", () => {
     expect(rufe("kuendigungsfrist_rechnen", { eintritt: "2025-01-01", zugang: "2026-10-07", kleinbetrieb_vier_wochen: true }).ergebnis.ende).toBe("2026-11-04");
     expect(rufe("kuendigungsfrist_rechnen", { eintritt: "2023-01-01", zugang: "2026-10-04", vertrag_monate: 3, vertrag_termin: "quartalsende" }).ergebnis.ende).toBe("2027-03-31");
   });
-  it("Kündigung durch Mitarbeitende: kein Lintelly-Hinweis, nur Grundfrist", () => {
+  it("Kündigung durch Mitarbeitende: nur Grundfrist", () => {
     const a = rufe("kuendigungsfrist_rechnen", { eintritt: "2016-08-01", zugang: "2026-10-04", wer_kuendigt: "arbeitnehmer" });
     expect(a.ergebnis.ende).toBe("2026-11-15");
-    expect(a.lintelly).toBeUndefined();
+    expect(a).not.toHaveProperty("lintelly");
   });
   it("lehnt Namen ab", () => {
     expect(() => rufe("kuendigungsfrist_rechnen", { eintritt: "2025-01-01", zugang: "2026-10-07", name: "Tom" })).toThrow(/Unbekanntes Feld/);
@@ -38,17 +38,17 @@ describe("klagefrist", () => {
     // Zugang Sa 07.11.2026 plus 21 Tage = Sa 28.11.2026, verschoben auf Mo 30.11.2026.
     const a = rufe("klagefrist", { zugang: "2026-11-07" });
     expect(a.ergebnis.ende).toBe("2026-11-30");
-    expect(a.lintelly).toBeDefined();
+    expect(a).not.toHaveProperty("lintelly");
   });
   it("Feiertag im Bundesland verschiebt: Zugang 11.12.2026 endet rechnerisch 01.01.2027, dann Montag 04.01.2027", () => {
     expect(rufe("klagefrist", { zugang: "2026-12-11", bundesland: "HE" }).ergebnis.ende).toBe("2027-01-04");
   });
 });
 
-describe("Hinweis auf Lintelly im Hinweis-Satz", () => {
-  it("bei Kündigung steht der Satz mit Link auch im Feld hinweis, sonst nur der Satz zur Auskunft", () => {
-    expect(rufe("kuendigungsfrist_rechnen", { eintritt: "2024-10-01", zugang: "2026-11-16" }).hinweis).toMatch(/^Allgemeine Auskunft, keine Rechtsberatung im Einzelfall\. .+https:\/\/lintelly\.com\/hr$/);
-    expect(rufe("klagefrist", { zugang: "2026-11-16" }).hinweis).toMatch(/lintelly\.com\/hr/);
+describe("kein Hinweis auf Lintelly-Angebote", () => {
+  it("auch bei Kündigung steht im Feld hinweis nur der Satz zur Auskunft", () => {
+    expect(rufe("kuendigungsfrist_rechnen", { eintritt: "2024-10-01", zugang: "2026-11-16" }).hinweis).toBe("Allgemeine Auskunft, keine Rechtsberatung im Einzelfall.");
+    expect(rufe("klagefrist", { zugang: "2026-11-16" }).hinweis).not.toMatch(/lintelly/);
     expect(rufe("rechtswert", { kennung: "mindestlohn" }).hinweis).toBe("Allgemeine Auskunft, keine Rechtsberatung im Einzelfall.");
   });
 });

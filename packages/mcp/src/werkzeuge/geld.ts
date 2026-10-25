@@ -138,7 +138,6 @@ const entgeltfortzahlung: Werkzeug = {
           : "Kommen in 12 Monaten mehr als 6 Wochen Arbeitsunfähigkeit zusammen, egal aus welcher Ursache, bietest du ein BEM an (§ 167 Abs. 2 SGB IX). Werkzeug bem_pflicht prüft das.",
         ...(letzter.efzBis ? [`Frist merken: Werkzeug frist_merken, Frist „Ende der Entgeltfortzahlung“ am ${fmt(letzter.efzBis)}.`] : []),
       ],
-      anlass: ueberSechsWochen ? "ernstfall" : null,
     }, heute);
   },
 };
@@ -307,7 +306,6 @@ const abfindung_faustformel: Werkzeug = {
         "Bevor du eine Zahl nennst: Kündigungsgrund, Frist und Sonderkündigungsschutz prüfen (Werkzeug sonderkuendigungsschutz_check).",
         "Halte eine vereinbarte Abfindung schriftlich fest, im Abwicklungs- oder Aufhebungsvertrag oder im Vergleich vor Gericht. Die Lohnsteuer rechnet dein Lohnbüro.",
       ],
-      anlass: "ernstfall",
     }, heute);
   },
 };

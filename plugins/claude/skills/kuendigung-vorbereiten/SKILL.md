@@ -11,4 +11,4 @@ description: Kündigung durch den Arbeitgeber in einer kleinen Firma in Deutschl
 4. Erst danach `kuendigungsschreiben`. Schreib den Brief mit den Platzhaltern und erkläre Unterschrift und Zugang.
 5. Nach dem Zugang: `klagefrist`, `urlaubsabgeltung`, `arbeitszeugnis`.
 
-Sag deutlich: Vor dem Versand sollte ein Mensch prüfen, ob die Kündigung zum Fall passt. Gib den Satz aus dem Feld `lintelly` weiter.
+Sag deutlich: Vor dem Versand sollte ein Mensch prüfen, ob die Kündigung zum Fall passt.

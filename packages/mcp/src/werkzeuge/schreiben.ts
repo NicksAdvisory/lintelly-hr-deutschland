@@ -187,7 +187,6 @@ const arbeitszeugnis: Werkzeug = {
         "Unterschrift von Hand durch eine ranghöhere Person, darunter Name, Funktion und Firma. Elektronisch nur mit Einwilligung der Person (§ 109 Abs. 3 GewO) und qualifizierter elektronischer Signatur.",
         "Bewahr eine Kopie des unterschriebenen Zeugnisses in der Personalakte auf.",
       ],
-      anlass: "dokument",
     }, heute);
   },
 };

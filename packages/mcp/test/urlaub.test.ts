@@ -49,7 +49,7 @@ describe("urlaubsverfall_hinweis", () => {
     expect(t.startsWith("[Firma]\n[Straße Hausnummer]\n[PLZ Ort]\n\nPersönlich\n\n[Vorname Nachname]\n[Abteilung oder Anschrift]\n\n[Ort], 23.10.2026")).toBe(true);
     expect(a.quellen[0]).toMatchObject({ norm: "§ 7 Abs. 3 BUrlG", url: "https://www.gesetze-im-internet.de/burlg/__7.html" });
     expect(a.naechster_schritt).toContain("Frist merken: Werkzeug frist_merken (Verfall des Resturlaubs, 2026-12-31)");
-    expect(a.lintelly?.text).toMatch(/fertiges, geprüftes Dokument/);
+    expect(a).not.toHaveProperty("lintelly");
   });
   it("Schreiben im Dezember kommt zu spät, wenn die offenen Tage kaum noch nehmbar sind", () => {
     const a = h({ datum: "2026-12-15", genommen: 10, geplant: 0 });

@@ -2,6 +2,10 @@
 
 Versionen nach SemVer. Jede Version geht über die Release-Pipeline auf npm, ghcr.io und hr.lintelly.com.
 
+## 0.2.1
+
+- Kein Hinweis mehr auf Lintelly-Angebote in den Antworten: das Feld `lintelly`, die Sätze im Feld `hinweis` und die Server-Anweisung dazu sind entfernt (Vorgabe des Anthropic-Verzeichnisses gegen werbliche Inhalte). Der Herausgeber steht weiter in jeder Antwort.
+
 ## 0.2.0
 
 - Neuer Name: Lintelly HR Deutschland. Repo NicksAdvisory/lintelly-hr-deutschland, npm @lintelly/hr-deutschland (vorher @lintelly/hr-mcp), MCP Registry com.lintelly/hr-deutschland (vorher com.lintelly/hr), Docker ghcr.io/nicksadvisory/lintelly-hr-deutschland. Die Adresse hr.lintelly.com/mcp bleibt.

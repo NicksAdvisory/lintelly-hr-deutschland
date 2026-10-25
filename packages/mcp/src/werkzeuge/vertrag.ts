@@ -140,7 +140,6 @@ const vertragsbausteine_suchen: Werkzeug = {
         gesperrt: r.gesperrt.map(({ klausel: k }) => ({ kennung: k.id, klausel: k.klausel, grund: k.grund, alternative: k.alternative })),
       },
       naechster_schritt: r.treffer.length ? ["Mit vertragsbaustein und der Kennung gibt es Angaben, Pflichtsätze und den Text."] : ["Anders suchen, z. B. mit einem Stichwort wie Überstunden, Bonus oder Kündigung."],
-      anlass: "vor_versand",
     }, heute);
   },
 };
@@ -169,7 +168,6 @@ const vertragsbaustein: Werkzeug = {
       naechster_schritt: ergebnis.text
         ? ["Text in den Vertrag übernehmen, [Name] ersetzen, Schutzsätze nicht streichen.", ...(b.nass ? ["Auf Papier mit Originalunterschrift abschließen."] : [])]
         : [`Diese Angaben fehlen noch: ${ergebnis.fehlende_angaben.map((f) => f.label).join(", ")}. Dann noch einmal aufrufen.`],
-      anlass: "vor_versand",
     }, heute);
   },
 };
@@ -188,7 +186,6 @@ const klausel_pruefen: Werkzeug = {
         einordnung: treffer.length ? ROT_EINORDNUNG : `Kein Treffer auf der roten Liste (${ROTE_LISTE.length} Klauseltypen). Das ist keine Prüfung der Wirksamkeit.`,
       },
       naechster_schritt: treffer.length ? ["Die Klausel streichen und die sichere Alternative mit vertragsbaustein holen."] : [],
-      anlass: "vor_versand",
     }, heute);
   },
 };

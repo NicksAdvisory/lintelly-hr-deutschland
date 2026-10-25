@@ -16,13 +16,13 @@ describe("probezeit", () => {
     expect(a.ergebnis).toMatchObject({ probezeit_ende: "2027-03-31", ende_bei_kuendigung_am_letzten_tag: "2027-04-14", kuendigungsschutz_ab: "2027-04-01" });
     expect(a.quellen[0]).toMatchObject({ norm: "§ 622 Abs. 3 BGB", url: "https://www.gesetze-im-internet.de/bgb/__622.html", status: "bestätigt" });
     expect(merken(a)).toContain("2027-03-31");
-    expect(a.lintelly?.text).toMatch(/10\. Person/);
+    expect(a).not.toHaveProperty("lintelly");
   });
   it("Azubi 4 Monate ab 01.08.2026: Ende 30.11.2026, Kündigung ohne Frist, keine Lücke zum KSchG", () => {
     const a = rufe("probezeit", { beginn: "2026-08-01", dauer: 4, ausbildung: true });
     expect(a.ergebnis).toMatchObject({ probezeit_ende: "2026-11-30", ende_bei_kuendigung_am_letzten_tag: "2026-11-30", kuendigungsfrist_tage: 0, luecke_bis_kuendigungsschutz: false });
     expect(a.quellen.map((q) => q.norm)).toContain("§ 20 Satz 2 BBiG");
-    expect(a.lintelly).toBeUndefined();
+    expect(a).not.toHaveProperty("lintelly");
   });
   it("Azubi 5 Monate ist ein Fehler (§ 20 BBiG)", () => {
     expect(rufe("probezeit", { beginn: "2026-10-01", dauer: 5, ausbildung: true }).ergebnis.fehler[0]).toMatch(/4 Monate/);
@@ -45,7 +45,7 @@ describe("befristung", () => {
     expect(a.ergebnis).toMatchObject({ spaetestes_ende: "2028-02-29", grundlage: "Regelfall", hoechstdauer_jahre: 2 });
     expect(a.quellen[0]).toMatchObject({ norm: "§ 14 Abs. 2 Satz 1 TzBfG", url: "https://www.gesetze-im-internet.de/tzbfg/__14.html" });
     expect(a.naechster_schritt?.some((s) => s.startsWith("Frist merken: Werkzeug frist_merken (Ende des befristeten Vertrags, 2026-12-31)"))).toBe(true);
-    expect(a.lintelly).toBeUndefined();
+    expect(a).not.toHaveProperty("lintelly");
   });
   it("3 Verlängerungen sind zulässig, keine übrig", () => {
     const a = bf({ verlaengerungen: [v("2026-03-20", "2026-06-30"), v("2026-06-20", "2026-09-30"), v("2026-09-20", "2027-12-31")] });

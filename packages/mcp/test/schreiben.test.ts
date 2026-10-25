@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ANLASS } from "../src/antwort";
+import { HINWEIS } from "../src/antwort";
 import { SCHREIBEN } from "../src/werkzeuge/schreiben";
 import { rufe } from "./hilfe";
 
@@ -26,7 +26,8 @@ describe("arbeitszeugnis", () => {
     expect(text).toContain("ist seit dem 01.04.2023");
     expect(text).toContain("erledigt die [ihr/ihm] übertragenen Aufgaben stets zu unserer vollsten Zufriedenheit");
     expect(text).toContain("Dieses Zwischenzeugnis stellen wir auf Wunsch von [Frau/Herr Nachname] aus.");
-    expect(a.lintelly?.text).toBe(ANLASS.dokument);
+    expect(a).not.toHaveProperty("lintelly");
+    expect(a.hinweis).toBe(HINWEIS);
     expect(a.quellen[0]).toMatchObject({ norm: "§ 109 GewO", url: "https://www.gesetze-im-internet.de/gewo/__109.html" });
   });
 
@@ -102,7 +103,7 @@ describe("stellenanzeige_check", () => {
     expect(a.ergebnis.aufbau.join(" ")).toContain("(m/w/d)");
     expect(a.ergebnis.aufbau.length).toBeGreaterThanOrEqual(6);
     expect(a.quellen.map((q) => q.url)).toContain("https://www.gesetze-im-internet.de/agg/__11.html");
-    expect(a.lintelly).toBeUndefined();
+    expect(a).not.toHaveProperty("lintelly");
   });
 
   it("Anzeigentext ist Pflicht und höchstens 3000 Zeichen lang", () => {
@@ -143,7 +144,7 @@ describe("interviewfragen_check", () => {
     expect(a.quellen.map((q) => q.url)).toEqual(expect.arrayContaining([
       "https://www.gesetze-im-internet.de/agg/__1.html", "https://www.gesetze-im-internet.de/agg/__7.html", "https://www.gesetze-im-internet.de/gg/art_9.html",
     ]));
-    expect(a.lintelly).toBeUndefined();
+    expect(a).not.toHaveProperty("lintelly");
   });
 
   it("kein Freitext: unbekanntes Feld und unbekannte Seniorität werden abgelehnt", () => {
@@ -162,7 +163,7 @@ describe("mitarbeitergespraech_leitfaden", () => {
       expect(a.ergebnis.ablauf.length, art).toBeGreaterThanOrEqual(4);
       expect(fragen(a).length, art).toBeGreaterThan(0);
       expect(a.ergebnis.protokoll, art).toEqual(expect.arrayContaining(["Datum", "Teilnehmende", "Anlass", "Vereinbarungen mit Verantwortlichen und Termin", "Folgetermin"]));
-      expect(a.lintelly, art).toBeUndefined();
+      expect(a, art).not.toHaveProperty("lintelly");
     }
   });
 
@@ -226,7 +227,7 @@ describe("nachweis_pflichtangaben", () => {
     expect(a.quellen.find((q) => q.norm.startsWith("§ 2 Abs. 1"))?.url).toBe("https://www.gesetze-im-internet.de/nachwg/__2.html");
     expect(a.fallen?.join(" ")).toContain("bis 2.000 Euro Bußgeld je Fall (§ 4 NachwG)");
     expect(a.ergebnis.formregeln.join(" ")).toContain("Seit dem 1. Januar 2025 darfst du den Nachweis auch in Textform erteilen");
-    expect(a.lintelly).toBeUndefined();
+    expect(a).not.toHaveProperty("lintelly");
   });
 
   it("Beispiel der Seite: Nr. 10 und 14 fehlen, 12 von 14 erfüllt, Lücken schließen", () => {

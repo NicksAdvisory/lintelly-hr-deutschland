@@ -24,18 +24,18 @@ describe("schwellen_check", () => {
   it("5 Köpfe: Betriebsrat möglich, kein Hinweis auf Lintelly", () => {
     const a = rufe("schwellen_check", { koepfe: 5 });
     expect(themen(a.ergebnis.gilt)).toContain("Betriebsrat kann gewählt werden");
-    expect(a.lintelly).toBeUndefined();
+    expect(a).not.toHaveProperty("lintelly");
   });
   it("9 Köpfe: nächste Schwelle 10, es fehlen 2, Hinweis Wachstum", () => {
     const a = rufe("schwellen_check", { koepfe: 9 });
     expect(a.ergebnis.naechste_schwelle).toMatchObject({ schwelle: "mehr als 10", fehlt: 2 });
-    expect(a.lintelly?.text).toMatch(/10\. Person/);
+    expect(a).not.toHaveProperty("lintelly");
   });
   it("12 Köpfe: Kündigungsschutzgesetz gilt, Hinweis Wachstum", () => {
     const a = rufe("schwellen_check", { koepfe: 12 });
     expect(themen(a.ergebnis.gilt)).toContain("Kündigungsschutzgesetz gilt");
     expect(a.quellen.map((q) => q.norm)).toContain("§ 23 Abs. 1 KSchG");
-    expect(a.lintelly?.text).toMatch(/10\. Person/);
+    expect(a).not.toHaveProperty("lintelly");
   });
   it("zählt nur die Firmengröße als Band", () => {
     expect(WERKZEUGE.find((w) => w.name === "schwellen_check")!.baender!({ koepfe: 7, azubis: 2 })).toEqual({ groesse: 7 });
@@ -63,7 +63,7 @@ describe("sonderkuendigungsschutz_check", () => {
     const a = rufe("sonderkuendigungsschutz_check", {});
     expect(a.ergebnis).toMatchObject({ ergebnis: "Kein Sonderschutz erkennbar", ampel: "gruen", offene_fragen: 11 });
     expect(a.fallen!.join(" ")).toMatch(/als „nein“/);
-    expect(a.lintelly?.text).toMatch(/Mensch/);
+    expect(a).not.toHaveProperty("lintelly");
   });
   it("mit Betriebsrat: Anhörung vor jeder Kündigung", () => {
     expect(rufe("sonderkuendigungsschutz_check", { betriebsrat_vorhanden: "ja" }).naechster_schritt!.join(" ")).toMatch(/§ 102 BetrVG/);
