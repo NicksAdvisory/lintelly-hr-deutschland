@@ -2,6 +2,10 @@
 
 Versionen nach SemVer. Jede Version geht über die Release-Pipeline auf npm, ghcr.io und hr.lintelly.com.
 
+## 0.2.2
+
+- Werkzeugbeschreibungen ohne Verweise auf andere Werkzeuge und ohne Anweisungen an das Modell (Richtlinie des Anthropic-Verzeichnisses). Die Reihenfolge steht weiter in den Server-Anweisungen und in den Skills des Plugins.
+
 ## 0.2.1
 
 - Kein Hinweis mehr auf Lintelly-Angebote in den Antworten: das Feld `lintelly`, die Sätze im Feld `hinweis` und die Server-Anweisung dazu sind entfernt (Vorgabe des Anthropic-Verzeichnisses gegen werbliche Inhalte). Der Herausgeber steht weiter in jeder Antwort.

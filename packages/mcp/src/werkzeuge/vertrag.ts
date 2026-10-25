@@ -127,7 +127,7 @@ const vertragsbausteine_suchen: Werkzeug = {
   name: "vertragsbausteine_suchen",
   titel: "Vertragsbausteine suchen",
   beschreibung:
-    "Search 126 German employment contract clauses (Vertragsbausteine), e.g. home office (Homeoffice), overtime (Überstunden), bonus, company car (Dienstwagen), non-compete (Wettbewerbsverbot), probation (Probezeit). Returns matching clauses with key and when they fit, and void clause types from the red list with the reason and the safe alternative. Then use vertragsbaustein with the key to get the text.",
+    "Search 126 German employment contract clauses (Vertragsbausteine), e.g. home office (Homeoffice), overtime (Überstunden), bonus, company car (Dienstwagen), non-compete (Wettbewerbsverbot), probation (Probezeit). Returns matching clauses with key and when they fit, and void clause types from the red list with the reason and the safe alternative.",
   eingabe: schema({
     suchtext: text("What the clause should cover, German works best, e.g. Homeoffice", { maxLength: 100 }),
     vertragsart: text("Type of contract, default arbeitsvertrag", { enum: ARTEN }),

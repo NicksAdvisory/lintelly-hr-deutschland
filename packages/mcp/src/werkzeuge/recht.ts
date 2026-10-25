@@ -31,7 +31,7 @@ const rechtswert: Werkzeug = {
   name: "rechtswert",
   titel: "Rechtswert mit Quelle",
   beschreibung:
-    "Look up one German employment law value (Rechtswert) by its key, e.g. mindestlohn (minimum wage), minijobGrenze, bbgRv, urlaubMindest. Returns the value valid on the given date, all dated values, the legal norm, the official source link, the date it was last checked and its status. Use rechtswerte_suchen first if you do not know the key.",
+    "Look up one German employment law value (Rechtswert) by its key, e.g. mindestlohn (minimum wage), minijobGrenze, bbgRv, urlaubMindest. Returns the value valid on the given date, all dated values, the legal norm, the official source link, the date it was last checked and its status.",
   eingabe: schema({ kennung: text("Key of the value, e.g. mindestlohn", { pattern: KENNUNG, maxLength: 60 }), stichtag: datum("Date the value should apply to, default today") }, ["kennung"]),
   ausfuehren(e, heute) {
     const eintrag = OEFFENTLICH.find((x) => x.id === e.kennung);

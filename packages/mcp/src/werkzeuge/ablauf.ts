@@ -379,7 +379,7 @@ const ablauf: Werkzeug = {
   name: "ablauf",
   titel: "HR-Ablauf mit Daten",
   beschreibung:
-    "German employment law, Germany only: a complete HR workflow (Ablauf) with dates, roles and legal norms for a situation, e.g. first hire (erste Einstellung), onboarding (Eintritt), leaving (Austritt), sick employee (Krankheit, Entgeltfortzahlung, U1, BEM), pregnancy (Mutterschutz), parental leave (Elternzeit), preparing a dismissal (Kündigung), end of probation, end of a fixed-term contract, monthly payroll (Lohn). Use this first when a founder describes a situation such as a first hire, a sick employee, a pregnancy or a planned dismissal, then use the specialised tools it names for details. Takes only dates, numbers and choices, never names.",
+    "German employment law, Germany only: a complete HR workflow (Ablauf) with dates, roles and legal norms for a situation, e.g. first hire (erste Einstellung), onboarding (Eintritt), leaving (Austritt), sick employee (Krankheit, Entgeltfortzahlung, U1, BEM), pregnancy (Mutterschutz), parental leave (Elternzeit), preparing a dismissal (Kündigung), end of probation, end of a fixed-term contract, monthly payroll (Lohn). Use it when a founder describes a situation such as a first hire, a sick employee, a pregnancy or a planned dismissal. Takes only dates, numbers and choices, never names.",
   eingabe: schema({
     art: text("Which workflow", { enum: ART_IDS }),
     datum: datum(`Anchor date, meaning per art: ${ART_IDS.map((k) => `${k} = ${ARTEN[k].datum}`).join("; ")}`),
@@ -424,7 +424,7 @@ const workflow_vorlage: Werkzeug = {
   name: "workflow_vorlage",
   titel: "HR-Workflow",
   beschreibung:
-    "German employment law, Germany only: the ten follow-up workflows of the Lintelly workbench (HR-Workflows), e.g. payroll input deadline, missing onboarding documents, sick leave with eAU and BEM, maternity protection, probation decision, fixed-term contract signed before start. Each shows the chain 'when ... then ...' with default days and roles. Use it as a template for your own reminders; for dates in a concrete case use ablauf. Without kennung it lists all ten.",
+    "German employment law, Germany only: the ten follow-up workflows of the Lintelly workbench (HR-Workflows), e.g. payroll input deadline, missing onboarding documents, sick leave with eAU and BEM, maternity protection, probation decision, fixed-term contract signed before start. Each shows the chain 'when ... then ...' with default days and roles. Use it as a template for your own reminders. Without kennung it lists all ten.",
   eingabe: schema({ kennung: text("Key of the workflow, leave out for the list", { enum: WORKFLOWS.map((w) => w.id) }) }),
   ausfuehren(e, heute) {
     const w = WORKFLOWS.find((x) => x.id === e.kennung);

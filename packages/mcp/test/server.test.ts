@@ -46,6 +46,13 @@ describe("Werkzeuge", () => {
       expect(Object.keys(t.inputSchema.properties ?? {}).join(" "), t.name).not.toMatch(/\b(name|vorname|nachname|email|e_mail|anschrift|adresse|telefon|geburtsname)\b/i);
     }
   });
+  it("Beschreibungen ohne Verweis auf andere Werkzeuge und ohne Anweisung an das Modell (Anthropic-Verzeichnis, Nick 25.10.2026)", async () => {
+    const tools = (await client.listTools()).tools;
+    for (const t of tools) {
+      for (const n of tools.map((x) => x.name).filter((n) => n !== t.name)) expect(t.description, t.name).not.toMatch(new RegExp(`\\b${n}\\b`));
+      expect(t.description, t.name).not.toMatch(/\bthen (use|write|rewrite|draft|fill)\b|\byou fill\b|\bask the user\b/i);
+    }
+  });
   it("Antwortformat: Ergebnis, Quellen, Hinweis, Stand, Herausgeber", async () => {
     const a = text(await client.callTool({ name: "rechtswert", arguments: { kennung: "mindestlohn" } }));
     expect(a).toMatchObject({ hinweis: "Allgemeine Auskunft, keine Rechtsberatung im Einzelfall.", stand: "2026-10-23", herausgeber: "Lintelly, lintelly.com" });

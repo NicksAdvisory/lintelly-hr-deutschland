@@ -95,7 +95,7 @@ const kuendigungsschreiben: Werkzeug = {
   name: "kuendigungsschreiben",
   titel: "Kündigungsschreiben",
   beschreibung:
-    "German employment law, Germany only. Builds an employer's termination letter (Kündigungsschreiben, ordentliche Kündigung) in DIN 5008 form with the end date calculated under § 622 BGB from start date and day of receipt (Zugang), plus the checklist before sending (Schriftform § 623 BGB, Zugang, Vollmacht, Klagefrist). Names, addresses and signer stay placeholders in square brackets; you fill them with the user's details. Not for summary dismissal (fristlose Kündigung) or apprentices.",
+    "German employment law, Germany only. Builds an employer's termination letter (Kündigungsschreiben, ordentliche Kündigung) in DIN 5008 form with the end date calculated under § 622 BGB from start date and day of receipt (Zugang), plus the checklist before sending (Schriftform § 623 BGB, Zugang, Vollmacht, Klagefrist). Names, addresses and signer stay placeholders in square brackets. Not for summary dismissal (fristlose Kündigung) or apprentices.",
   eingabe: schema({
     eintritt: datum("First day of employment (Eintritt); apprenticeship in the same company counts"),
     zugang: datum("Day the employee receives the signed original (Zugang), not the date of the letter"),
@@ -241,7 +241,7 @@ const abmahnung: Werkzeug = {
   name: "abmahnung",
   titel: "Abmahnung",
   beschreibung:
-    "German employment law, Germany only. Gives you what you need to write a formal warning letter (Abmahnung) yourself: the required parts (Rüge with date and time, verletzte Pflicht, Hinweis, Warnung vor Kündigung), a letter template with placeholders, writing rules, checklist and pitfalls. Use it when an employer wants to warn an employee about misconduct; ask the user for the facts, then fill the template with them, roles instead of names of third parties. The facts themselves never go into this tool.",
+    "German employment law, Germany only. Gives you what you need to write a formal warning letter (Abmahnung) yourself: the required parts (Rüge with date and time, verletzte Pflicht, Hinweis, Warnung vor Kündigung), a letter template with placeholders, writing rules, checklist and pitfalls. Use it when an employer wants to warn an employee about misconduct. The template uses roles instead of names of third parties. The facts themselves never go into this tool.",
   eingabe: schema({
     verstoss: text("Kind of misconduct (Art des Verstoßes)", { enum: Object.keys(VERSTOESSE) }),
     datum_vorfall: datum("Day of the incident (Datum des Vorfalls)"),
@@ -297,7 +297,7 @@ const kuendigung_pflichtangaben: Werkzeug = {
   name: "kuendigung_pflichtangaben",
   titel: "Kündigung: Formalien prüfen",
   beschreibung:
-    `German employment law, Germany only. Checklist of the formal requirements when an employer gives notice (Kündigung durch den Arbeitgeber), each item with its legal norm: written form, receipt (Zugang), notice period, works council hearing, special protection (Sonderkündigungsschutz), small business without the Kündigungsschutzgesetz up to ${WERTE.kschgSchwelle.wert} employees, ${WERTE.kschgKlageWochen.wert}-week deadline for a claim, Arbeitsbescheinigung, reference (Zeugnis), remaining holiday. Use it before a dismissal; for the end date and the letter use kuendigungsschreiben.`,
+    `German employment law, Germany only. Checklist of the formal requirements when an employer gives notice (Kündigung durch den Arbeitgeber), each item with its legal norm: written form, receipt (Zugang), notice period, works council hearing, special protection (Sonderkündigungsschutz), small business without the Kündigungsschutzgesetz up to ${WERTE.kschgSchwelle.wert} employees, ${WERTE.kschgKlageWochen.wert}-week deadline for a claim, Arbeitsbescheinigung, reference (Zeugnis), remaining holiday. Use it before a dismissal.`,
   eingabe: schema({
     beschaeftigte: zahl("Number of employees counted under § 23 KSchG: apprentices not counted, part-time pro rata", 1, 10000),
     betriebsrat: janein("There is a works council (Betriebsrat), default false"),

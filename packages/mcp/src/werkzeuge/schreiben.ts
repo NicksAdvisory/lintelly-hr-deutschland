@@ -78,7 +78,7 @@ const arbeitszeugnis: Werkzeug = {
   name: "arbeitszeugnis",
   titel: "Arbeitszeugnis: Aufbau und Zeugnissprache",
   beschreibung:
-    "German employment reference (Arbeitszeugnis, Zwischenzeugnis, Endzeugnis), Germany only. Use it when a founder wants a reference written: give the kind of reference and a grade from 1 to 5 per area, never names. Returns the structure with mandatory parts, the coded wording (Zeugnissprache) for each grade, the overall grade with its satisfaction formula, forbidden codes and traps, and the legal claim under § 109 GewO. You then write the reference text from this structure and let the user fill in names.",
+    "German employment reference (Arbeitszeugnis, Zwischenzeugnis, Endzeugnis), Germany only. Use it when a founder wants a reference written: give the kind of reference and a grade from 1 to 5 per area, never names. Returns the structure with mandatory parts, the coded wording (Zeugnissprache) for each grade, the overall grade with its satisfaction formula, forbidden codes and traps, and the legal claim under § 109 GewO.",
   eingabe: schema({
     art: text("endzeugnis (final reference at the end of employment) or zwischenzeugnis (interim reference while employed), default endzeugnis", { enum: ["endzeugnis", "zwischenzeugnis"] }),
     umfang: text("qualifiziert (with performance and conduct, the usual case) or einfach (only kind and duration of work), default qualifiziert", { enum: ["qualifiziert", "einfach"] }),
@@ -201,7 +201,7 @@ const stellenanzeige_check: Werkzeug = {
   name: "stellenanzeige_check",
   titel: "Stellenanzeige: AGG-Check",
   beschreibung:
-    "Checks a German job ad (Stellenanzeige) for discrimination traps under the AGG (Allgemeines Gleichbehandlungsgesetz), Germany only. Use it before a founder publishes a job ad or after you drafted one: pass the ad text. Returns each risky word with the protected characteristic (Merkmal), the reason and a better wording, plus the parts of a good ad; the text itself is neither stored nor returned. Then rewrite the ad with the better wordings.",
+    "Checks a German job ad (Stellenanzeige) for discrimination traps under the AGG (Allgemeines Gleichbehandlungsgesetz), Germany only. Use it before a founder publishes a job ad or after you drafted one: pass the ad text. Returns each risky word with the protected characteristic (Merkmal), the reason and a better wording, plus the parts of a good ad; the text itself is neither stored nor returned.",
   eingabe: schema({ anzeigentext: text("Full text of the job ad, at most 3000 characters, without names or contact details", { maxLength: 3000 }) }, ["anzeigentext"]),
   ausfuehren(e, heute) {
     const t = String(e.anzeigentext);
@@ -264,7 +264,7 @@ const interviewfragen_check: Werkzeug = {
   name: "interviewfragen_check",
   titel: "Vorstellungsgespräch: erlaubte und verbotene Fragen",
   beschreibung:
-    "Checklist for job interviews in Germany (Vorstellungsgespräch, Interviewfragen), Germany only. Use it when a founder prepares an interview or asks whether a question is allowed, e.g. about pregnancy (Schwangerschaft), religion, health or age under the AGG. Returns forbidden and sensitive topics with the reason, allowed questions, the method for structured questions with rating anchors and the interview flow. Then write the concrete questions for the role from it.",
+    "Checklist for job interviews in Germany (Vorstellungsgespräch, Interviewfragen), Germany only. Use it when a founder prepares an interview or asks whether a question is allowed, e.g. about pregnancy (Schwangerschaft), religion, health or age under the AGG. Returns forbidden and sensitive topics with the reason, allowed questions, the method for structured questions with rating anchors and the interview flow.",
   eingabe: schema({
     senioritaet: text("Seniority of the role: ausbildung (apprenticeship or internship), berufseinstieg (entry level), berufserfahren (2 to 5 years), senior, fuehrungskraft (manager)", { enum: SENIORITAET }),
     form: text("Interview setting: vor_ort (in person) or telefon_video (phone or video)", { enum: ["vor_ort", "telefon_video"] }),
@@ -405,7 +405,7 @@ const mitarbeitergespraech_leitfaden: Werkzeug = {
   name: "mitarbeitergespraech_leitfaden",
   titel: "Mitarbeitergespräch: Leitfaden",
   beschreibung:
-    "Guide for employee meetings in German companies (Mitarbeitergespräch), Germany only: critical feedback (Kritikgespräch), probation review (Probezeitgespräch), annual review (Jahresgespräch) or return after illness (Rückkehrgespräch). Use it when a founder has to hold such a meeting. Returns duration, preparation, phases with goal and open questions, difficult moments, a minutes template and legal traps such as BEM or works council rights. Then write the exact wording for each phase from it.",
+    "Guide for employee meetings in German companies (Mitarbeitergespräch), Germany only: critical feedback (Kritikgespräch), probation review (Probezeitgespräch), annual review (Jahresgespräch) or return after illness (Rückkehrgespräch). Use it when a founder has to hold such a meeting. Returns duration, preparation, phases with goal and open questions, difficult moments, a minutes template and legal traps such as BEM or works council rights.",
   eingabe: schema({
     art: text("Kind of meeting: kritik (critical feedback), probezeit (probation review), jahr (annual review), rueckkehr (return after illness)", { enum: Object.keys(GESPRAECHE) }),
     betriebsrat: janein("The company has a works council (Betriebsrat), default false"),
@@ -480,7 +480,7 @@ const nachweis_pflichtangaben: Werkzeug = {
   name: "nachweis_pflichtangaben",
   titel: "Arbeitsvertrag-Check: Pflichtangaben nach NachwG",
   beschreibung:
-    "Checklist of the mandatory written terms of employment under § 2 Abs. 1 NachwG (Nachweisgesetz, Arbeitsvertrag-Check), Germany only. Use it when a founder hires someone or checks a contract: with the start date it gives the deadline for each of the 15 items (first working day, 7th calendar day, one month), with an answer per item it shows what is missing or overdue. It also checks the form: written form, text form since 2025 under conditions, paper-only industries and fixed-term contracts. Then draft the missing clauses or a separate written statement from it.",
+    "Checklist of the mandatory written terms of employment under § 2 Abs. 1 NachwG (Nachweisgesetz, Arbeitsvertrag-Check), Germany only. Use it when a founder hires someone or checks a contract: with the start date it gives the deadline for each of the 15 items (first working day, 7th calendar day, one month), with an answer per item it shows what is missing or overdue. It also checks the form: written form, text form since 2025 under conditions, paper-only industries and fixed-term contracts.",
   eingabe: schema({
     beginn: datum("Agreed first day of employment; deadlines count from it"),
     befristet: janein("Fixed-term contract (befristet), default false"),
