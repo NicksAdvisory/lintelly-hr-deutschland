@@ -185,5 +185,11 @@ t("Abfindung: Zugang nach dem Ende ist ein Fehler", () => assert.ok(abf({ eintri
 t("Zeugnis: Teilnoten 2, 2, 3, 3 ergeben bei Gleichstand die bessere Note 2", () => assert.equal(Z.gesamtNote([2, 2, 3, 3]).note, 2));
 t("Zeugnis: 2, 3, 3, 3 ergeben 3, 1, 1, 1, 2 ergeben 1", () => { assert.equal(Z.gesamtNote([2, 3, 3, 3]).note, 3); assert.equal(Z.gesamtNote([1, 1, 1, 2]).note, 1); });
 
+const Dat = await import("../components/tools/datum.ts");
+t("Zeitraum: Ende im Jahr 2199 rechnet zu Ende statt endlos (Review 29.10.2026)", () => {
+  const r = Dat.ymd(D("2015-01-01"), D("2199-12-31"));
+  assert.ok(r.y >= 184);
+});
+
 console.log(`\n${n} Tests bestanden${rot.length ? `, ${rot.length} rot` : ""}.`);
 if (rot.length) process.exit(1);

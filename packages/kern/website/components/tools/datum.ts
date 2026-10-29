@@ -46,7 +46,8 @@ export function fmt(d: Date | null | undefined, wochentag = false) {
  */
 export function ymd(from: Date, to: Date) {
   let m = 0;
-  while (periodEnd(from, m + 1) < to) m++;
+  // Ohne gültiges Ende (Jahr ab 2200) bricht die Zählung ab, statt endlos zu laufen.
+  for (let e = periodEnd(from, 1); e && e < to; e = periodEnd(from, m + 1)) m++;
   const d = diffDays(m ? addDays(periodEnd(from, m), 1) : from, to);
   return { y: Math.floor(m / 12), m: m % 12, d: Math.max(0, d) };
 }

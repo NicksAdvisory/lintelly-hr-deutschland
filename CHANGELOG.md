@@ -2,7 +2,7 @@
 
 Versionen nach SemVer. Jede Version geht über die Release-Pipeline auf npm, ghcr.io und hr.lintelly.com.
 
-## Unveröffentlicht (Zweig mcp-fixes-29-10)
+## 0.3.0
 
 ### Kern auf Stand 29.10.2026 (Werkbank main, lintelly.com main)
 
