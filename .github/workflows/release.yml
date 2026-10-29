@@ -41,6 +41,7 @@ jobs:
       - run: npm run check
       - run: npm run build
       - name: Rauchtest
+        env: { RAUCHTEST_USER_AGENT: lintelly-rauchtest }
         run: |
           node packages/mcp/dist/lintelly-hr-mcp-server.mjs --http --port 8787 &
           sleep 2
@@ -73,10 +74,20 @@ jobs:
           context: .
           push: true
           tags: ghcr.io/nicksadvisory/lintelly-hr-deutschland:${{ env.V }},ghcr.io/nicksadvisory/lintelly-hr-deutschland:latest
+      # mcp-publisher fest auf eine Version und deren Prüfsumme (aus registry_1.8.1_checksums.txt und der GitHub-API, 29.10.2026).
+      # Laden und Prüfen ohne Schlüssel; erst der nächste Schritt bekommt MCP_REGISTRY_KEY. Neue Version: beide Werte zusammen ändern.
+      - name: mcp-publisher laden und Prüfsumme prüfen
+        if: vars.MCP_REGISTRY == 'true'
+        env:
+          PUBLISHER_VERSION: v1.8.1
+          PUBLISHER_SHA256: a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc
+        run: |
+          curl -sfL -o mcp-publisher.tar.gz "https://github.com/modelcontextprotocol/registry/releases/download/$PUBLISHER_VERSION/mcp-publisher_linux_amd64.tar.gz"
+          echo "$PUBLISHER_SHA256  mcp-publisher.tar.gz" | sha256sum -c -
+          tar xzf mcp-publisher.tar.gz mcp-publisher
       - name: MCP Registry (nur bestehender Eintrag, die erste Einreichung macht Nick)
         if: vars.MCP_REGISTRY == 'true'
         env: { SCHLUESSEL: "${{ secrets.MCP_REGISTRY_KEY }}" }
         run: |
-          curl -sL "https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
           ./mcp-publisher login dns --domain lintelly.com --private-key "$SCHLUESSEL"
           ./mcp-publisher publish
