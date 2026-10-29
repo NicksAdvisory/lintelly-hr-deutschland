@@ -1,5 +1,6 @@
 import { formatDE } from "@/lib/regeln/datum";
 import type { Anlass, Schritt } from "@/lib/workflows/kern";
+import type { Bedingung } from "@/lib/workflows/bauen";
 
 /**
  * Die zehn mitgelieferten Workflows (Nick 21.10.2026: "bau mir bitte 10 workflows die du empfiehlst", Auswahl aus
@@ -25,6 +26,10 @@ export type Workflow = {
   /** Einstellbare Tage je Kunde. */
   tage: Record<string, { label: string; wert: number }>;
   teile: Teil[];
+  /** Gilt nur für Personen, auf die alle Bedingungen passen (Baukasten, Nick 24.10.2026). */
+  bedingungen?: Bedingung[];
+  /** Selbst gebaut, nicht mitgeliefert. */
+  eigen?: { von: string; erstellt: string };
 };
 
 const name = (a: Anlass) => a.titel;

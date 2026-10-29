@@ -8,7 +8,7 @@ describe("Form und Freigabe", () => {
   it("P-001 Schriftform", () => { expect(schlaegt({ M2: {} }, "P-001")).toBe(true); expect(schlaegt({ D1: {} }, "P-001")).toBe(false); });
   it("P-002 gelber Baustein ohne Freigabe, mit Freigabe still", () => {
     expect(schlaegt({ D5: {} }, "P-002")).toBe(true);
-    expect(schlaegt({ D5: {} }, "P-002", { freigaben: { "D5@1": "2026-10-12" } })).toBe(false);
+    expect(schlaegt({ D5: {} }, "P-002", { freigaben: { "D5@1+en": "2026-10-12" } })).toBe(false);
   });
   it("P-003 Freitext ungeprüft", () => { expect(schlaegt({ D1: { ergaenzung: "Sonderregel" } }, "P-003")).toBe(true); expect(schlaegt({ D1: {} }, "P-003")).toBe(false); });
   it("P-004 Schriftform für Erklärungen der Person", () => {

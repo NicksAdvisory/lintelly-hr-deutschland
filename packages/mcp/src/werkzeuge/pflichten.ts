@@ -3,9 +3,9 @@
  * Gerechnet wird nur mit der Logik der Website (packages/kern/website/components/tools/*-logik.ts), Texte und Warnungen
  * folgen den Seiten. Fehlerhafte Angaben kommen als ergebnis.fehler zurück, nicht als Zahl.
  */
-import { AB_EINS, gewichtet, gewichtetU1, pruefe, pruefeSwEingabe, REGELN, SW_FELDER, type Regel, type Status, type SwFeld } from "../../../kern/website/components/tools/schwellenwerte-logik";
+import { AB_EINS, fehltText, gewichtet, gewichtetU1, pruefe, pruefeSwEingabe, REGELN, SW_FELDER, type Regel, type Status, type SwFeld } from "../../../kern/website/components/tools/schwellenwerte-logik";
 import { auswerten, SCHUTZ, type Antwort, type Stufe } from "../../../kern/website/components/tools/sonderkuendigungsschutz-logik";
-import { berechneBem, TAGE } from "../../../kern/website/components/tools/bem-logik";
+import { abstandText, berechneBem, hochrechnung, TAGE } from "../../../kern/website/components/tools/bem-logik";
 import { addMonthsDay, fmtDay, fromDay, toDay, weekdayDay } from "../../../kern/website/components/tools/datum";
 import { plural, zahl as dz } from "../../../kern/website/components/tools/format";
 import { antwort, normQuelle, registerQuelle, type Quelle } from "../antwort";
@@ -41,7 +41,6 @@ const zeile = (x: Treffer, voll: boolean, ohneAngabe = false) => ({
   ...(x.status === "ohneBr" ? { nur_mit_betriebsrat: true } : {}),
   folge: voll ? x.r.folge : x.r.folge.split(". ")[0].replace(/\.?$/, "."),
 });
-const koepfe = (n: number) => (Number.isInteger(n) ? plural(n, "Kopf", "Köpfe") : `${dz(n)} gewichtete Köpfe`);
 
 const anzahl = (description: string) => zahl(description, 0, 100000);
 
@@ -82,7 +81,7 @@ const schwellen_check: Werkzeug = {
         gewichtet_u1: gewichtetU1(s),
         gilt: gilt.map((x) => zeile(x, true)),
         gilt_nicht: offen.map((x) => zeile(x, false, x.r.id === "dsb" && s.datenPersonen === null)),
-        naechste_schwelle: naechste ? { thema: naechste.r.thema, gesetz: naechste.r.gesetz, schwelle: grenzText(naechste.r), fehlt: naechste.fehlt, folge: naechste.r.folge } : null,
+        naechste_schwelle: naechste ? { thema: naechste.r.thema, gesetz: naechste.r.gesetz, schwelle: grenzText(naechste.r), fehlt: naechste.fehlt, ...(naechste.r.basis ? { zaehlbasis: naechste.r.basis } : {}), folge: naechste.r.folge } : null,
         ...(pflichtplaetze ? { pflichtplaetze_schwerbehinderte: pflichtplaetze } : {}),
         ab_dem_ersten_beschaeftigten: AB_EINS,
       },
@@ -102,7 +101,7 @@ const schwellen_check: Werkzeug = {
       ],
       naechster_schritt: [
         ...(naechste
-          ? [`Nächste Schwelle: ${naechste.r.thema} (${grenzText(naechste.r)}). Dir ${naechste.fehlt === 1 ? "fehlt" : "fehlen"} ${koepfe(naechste.fehlt)}. Dann gilt: ${naechste.r.folge}`]
+          ? [`Nächste Schwelle: ${naechste.r.thema} (${grenzText(naechste.r)}). Dir ${naechste.fehlt === 1 ? "fehlt" : "fehlen"} ${fehltText(naechste.fehlt)}.${naechste.r.basis ? ` ${naechste.r.basis} Bei dir ${dz(naechste.wert)}.` : ""} Dann gilt: ${naechste.r.folge}`]
           : []),
         ...(pflichtplaetze > s.schwerbehindert
           ? [`Pflichtplätze für schwerbehinderte Menschen: ${pflichtplaetze}, besetzt ${s.schwerbehindert}. Für unbesetzte Pflichtplätze fällt Ausgleichsabgabe an, Anzeige und Zahlung bis 31. März für das Vorjahr (Werkzeug ausgleichsabgabe).`]
@@ -244,7 +243,7 @@ const bem_pflicht: Werkzeug = {
         grenze_kalendertage: 42,
         grenze_arbeitstage: r.schwelleArbeitstage,
         bem_pflicht: pflicht,
-        ...(pflicht ? { grenze_ueberschritten_am: erstmals === null ? null : fromDay(erstmals), gezaehlt_nach: nach } : { fehlen_noch_kalendertage: 43 - r.kalendertage }),
+        ...(pflicht ? { grenze_ueberschritten_am: erstmals === null ? null : fromDay(erstmals), gezaehlt_nach: nach } : { bis_zur_grenze: abstandText(r) }),
         zeitraeume: bloecke.map(([a, b]) => ({ von: fromDay(a), bis: fromDay(b), tage: b - a + 1 })),
       },
       rechenweg: [
@@ -257,6 +256,7 @@ const bem_pflicht: Werkzeug = {
       fallen: [
         ...(r.ueberKalender !== r.ueberArbeit ? ["Die Zählweisen kommen zu verschiedenen Ergebnissen. Ob sechs Wochen 42 Kalendertage oder Arbeitstage sind, ist nicht abschließend geklärt. Biete das BEM an, sobald eine Zählweise die Grenze überschreitet. Ein angebotenes BEM schadet nie."] : []),
         ...(spaeter.length ? [`Zeitraum ${spaeter.join(", ")} beginnt nach dem Stichtag und zählt nicht.`] : []),
+        ...(hochrechnung(perioden, st, toDay(heute)) ? [`Hochrechnung: Der Stichtag liegt in der Zukunft. Einen Zeitraum ohne Ende zählen wir bis zum ${fmtDay(st)} weiter, als bliebe die Person bis dahin krank.`] : []),
         "Seit 30.07.2026 zählen auch Zeiten mit Teilarbeitsunfähigkeit (§ 167 Abs. 2 Satz 1 SGB IX).",
         "Die Pflicht gilt auch im Kleinbetrieb, ab dem ersten Beschäftigten.",
         "Vor einer krankheitsbedingten Kündigung lass den Ablauf prüfen. Ohne angebotenes BEM wird sie schwer zu halten.",

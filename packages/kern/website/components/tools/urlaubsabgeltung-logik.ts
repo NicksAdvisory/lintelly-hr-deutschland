@@ -58,7 +58,7 @@ export function anspruchImAustrittsjahr(o: {
     : teil
     ? "Die Wartezeit von 6 Monaten (§ 4 BUrlG) ist bis zum Austritt nicht erfüllt. Es gibt Teilurlaub: 1/12 je vollem Beschäftigungsmonat (§ 5 Abs. 1 b BUrlG)."
     : o.mehrZwoelfteln
-    ? `Austritt in der zweiten Jahreshälfte nach erfüllter Wartezeit: Der gesetzliche Mindesturlaub steht voll zu. Der vertragliche Mehrurlaub wird laut Vertrag gezwölftelt.${sechs}`
+    ? `Austritt in der zweiten Jahreshälfte nach erfüllter Wartezeit: Der gesetzliche Mindesturlaub steht voll zu. Den Urlaub über dem gesetzlichen Minimum gibt es laut Vertrag nur anteilig: 1/12 je vollem Monat.${sechs}`
     : `Austritt in der zweiten Jahreshälfte nach erfüllter Wartezeit: Der volle Jahresurlaub steht zu (§ 5 Abs. 1 BUrlG greift nicht).${sechs}`;
   return {
     anspruch: r.gesamt,
@@ -75,4 +75,19 @@ export function anspruchImAustrittsjahr(o: {
 /** Tagessatz nach § 11 BUrlG: Verdienst der letzten 13 Wochen ÷ (13 × Arbeitstage pro Woche). */
 export function tagessatz(verdienst13: number, tageWoche: number) {
   return verdienst13 / (13 * tageWoche);
+}
+
+/**
+ * Paragrafen aus dem Fließtext in den Rechenweg (UX-Review 28.10.2026): Der Hinweis liest sich ohne Klammern,
+ * die Fundstellen stehen gesammelt darunter. "(§ 5 Abs. 1 c BUrlG)" wird aus dem Text genommen und gemerkt.
+ */
+export function ohneParagrafen(t: string): { text: string; paragrafen: string[] } {
+  const paragrafen: string[] = [];
+  const text = t
+    .replace(/\s*\((§[^()]*)\)/g, (_, p: string) => {
+      if (!paragrafen.includes(p)) paragrafen.push(p);
+      return "";
+    })
+    .replace(/\s+([.,:])/g, "$1");
+  return { text, paragrafen };
 }

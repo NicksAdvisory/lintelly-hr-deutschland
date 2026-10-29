@@ -6,6 +6,8 @@ export type Stufe = "zustimmung" | "ausgeschlossen" | "pruefen";
 type Schutz = {
   id: string;
   frage: string;
+  /** dieselbe Frage gegliedert, wenn sie mehrere Bedingungen hat (Anzeige, Design-Review 28.10.2026). frage bleibt der ganze Satz. */
+  teile?: { satz: string; punkte: string[] };
   hilfe: string;
   titel: string;
   grundlage: string;
@@ -19,6 +21,7 @@ export const SCHUTZ: Schutz[] = [
   {
     id: "mutterschutz",
     frage: "Ist die Person schwanger, hat sie vor höchstens 4 Monaten entbunden, ist sie noch in der Schutzfrist nach der Geburt oder hatte sie eine Fehlgeburt nach der 12. Schwangerschaftswoche?",
+    teile: { satz: "Trifft eins davon auf die Person zu?", punkte: ["Sie ist schwanger.", "Sie hat vor höchstens 4 Monaten entbunden.", "Sie ist noch in der Schutzfrist nach der Geburt.", "Sie hatte eine Fehlgeburt nach der 12. Schwangerschaftswoche."] },
     hilfe: "Gilt auch, wenn du von der Schwangerschaft nichts weißt: Sie kann sie bis 2 Wochen nach Zugang der Kündigung mitteilen.",
     titel: "Mutterschutz",
     grundlage: "§ 17 MuSchG",
@@ -33,6 +36,7 @@ export const SCHUTZ: Schutz[] = [
   {
     id: "elternzeit",
     frage: "Hat die Person Elternzeit verlangt oder ist sie in Elternzeit? Oder arbeitet sie in Teilzeit, während sie Elterngeld bezieht?",
+    teile: { satz: "Trifft eins davon auf die Person zu?", punkte: ["Sie hat Elternzeit verlangt.", "Sie ist in Elternzeit.", "Sie arbeitet in Teilzeit, während sie Elterngeld bezieht."] },
     hilfe: "Der Schutz beginnt mit dem Verlangen, frühestens 8 Wochen vor Beginn der Elternzeit, bei Elternzeit zwischen dem 3. und 8. Geburtstag frühestens 14 Wochen vorher.",
     titel: "Elternzeit",
     grundlage: "§ 18 BEEG",
@@ -47,6 +51,7 @@ export const SCHUTZ: Schutz[] = [
   {
     id: "pflege",
     frage: "Hat die Person eine kurzzeitige Arbeitsverhinderung, Pflegezeit oder Familienpflegezeit angekündigt oder nimmt sie diese gerade?",
+    teile: { satz: "Hat die Person eins davon angekündigt oder nimmt sie es gerade?", punkte: ["kurzzeitige Arbeitsverhinderung", "Pflegezeit", "Familienpflegezeit"] },
     hilfe: "Kurzzeitige Arbeitsverhinderung (bis 10 Tage) gibt es in jedem Betrieb. Pflegezeit ab mehr als 15, Familienpflegezeit ab mehr als 25 Beschäftigten.",
     titel: "Pflegezeit und Familienpflegezeit",
     grundlage: "§ 5 PflegeZG, § 2 Abs. 3 FPfZG",
@@ -58,6 +63,7 @@ export const SCHUTZ: Schutz[] = [
   {
     id: "betriebsrat",
     frage: "Ist die Person Mitglied im Betriebsrat, in der Jugend- und Auszubildendenvertretung oder Vertrauensperson der Schwerbehinderten? Oder ist sie in den letzten 12 Monaten aus dem Amt ausgeschieden?",
+    teile: { satz: "Trifft eins davon auf die Person zu?", punkte: ["Sie ist Mitglied im Betriebsrat.", "Sie ist Mitglied in der Jugend- und Auszubildendenvertretung.", "Sie ist Vertrauensperson der Schwerbehinderten.", "Sie ist in den letzten 12 Monaten aus einem dieser Ämter ausgeschieden."] },
     hilfe: "Auch Ersatzmitglieder, solange sie nachrücken oder vertreten haben.",
     titel: "Amtsträger der Betriebsverfassung",
     grundlage: "§ 15 Abs. 1 KSchG, § 103 BetrVG, § 179 Abs. 3 SGB IX",
@@ -73,6 +79,7 @@ export const SCHUTZ: Schutz[] = [
   {
     id: "wahl",
     frage: "Ist die Person im Wahlvorstand, Wahlbewerber oder hat sie zu einer Betriebsratswahl eingeladen oder eine Wahl beglaubigt vorbereitet?",
+    teile: { satz: "Trifft eins davon auf die Person zu?", punkte: ["Sie ist im Wahlvorstand.", "Sie ist Wahlbewerberin oder Wahlbewerber.", "Sie hat zu einer Betriebsratswahl eingeladen.", "Sie hat eine Wahl beglaubigt vorbereitet."] },
     hilfe: "Der Schutz wirkt nach: für Wahlvorstand und Bewerber 6 Monate nach Bekanntgabe des Wahlergebnisses.",
     titel: "Betriebsratswahl",
     grundlage: "§ 15 Abs. 3, 3a, 3b KSchG, § 103 BetrVG",
@@ -104,6 +111,7 @@ export const SCHUTZ: Schutz[] = [
   {
     id: "dsb",
     frage: "Ist die Person eure benannte Datenschutzbeauftragte, weil ihr eine benennen müsst? Oder wurde sie in den letzten 12 Monaten abberufen?",
+    teile: { satz: "Trifft eins davon auf die Person zu?", punkte: ["Sie ist eure benannte Datenschutzbeauftragte, weil ihr eine benennen müsst.", "Sie wurde in den letzten 12 Monaten als Datenschutzbeauftragte abberufen."] },
     hilfe: "Pflicht in der Regel, wenn mindestens 20 Personen ständig mit der automatisierten Verarbeitung personenbezogener Daten beschäftigt sind. Bei freiwilliger Benennung gilt der Schutz nicht.",
     titel: "Datenschutzbeauftragte",
     grundlage: "§ 38 Abs. 2 in Verbindung mit § 6 Abs. 4 BDSG",
@@ -129,6 +137,7 @@ export const SCHUTZ: Schutz[] = [
   {
     id: "beauftragte",
     frage: "Ist die Person bestellte Immissionsschutz-, Störfall-, Abfall- oder Gewässerschutzbeauftragte? Oder wurde sie in den letzten 12 Monaten abberufen?",
+    teile: { satz: "Ist die Person für eins davon bestellt oder wurde sie in den letzten 12 Monaten abberufen?", punkte: ["Immissionsschutzbeauftragte", "Störfallbeauftragte", "Abfallbeauftragte", "Gewässerschutzbeauftragte"] },
     hilfe: "Betrifft vor allem Betriebe mit genehmigungsbedürftigen Anlagen, Abfallerzeuger und Abwassereinleiter.",
     titel: "Betriebsbeauftragte für Umweltschutz",
     grundlage: "§§ 58, 58d BImSchG, § 60 Abs. 3 KrWG, § 66 WHG",
@@ -140,6 +149,7 @@ export const SCHUTZ: Schutz[] = [
   {
     id: "wehrdienst",
     frage: "Hat die Person einen Einberufungsbescheid erhalten oder leistet sie gerade Wehrdienst oder eine Wehrübung?",
+    teile: { satz: "Trifft eins davon auf die Person zu?", punkte: ["Sie hat einen Einberufungsbescheid erhalten.", "Sie leistet gerade Wehrdienst oder eine Wehrübung."] },
     hilfe: "Gilt auch für den freiwilligen Wehrdienst.",
     titel: "Wehrdienst und Wehrübung",
     grundlage: "§ 2 ArbPlSchG",
@@ -173,12 +183,18 @@ export function auswerten(a: Record<string, Antwort>, sechsMonate: Antwort): Tre
     if (ant !== "ja" && ant !== "unklar") continue;
     let effektiv: Stufe = ant === "unklar" ? "pruefen" : s.stufe;
     let zusatz: string | undefined;
+    let schritte = s.schritte;
     if (s.id === "schwerbehindert") {
       if (ant === "unklar") {
         zusatz =
           "Wenn ein Antrag läuft: Der Schutz greift, wenn der Antrag mindestens 3 Wochen vor Zugang der Kündigung gestellt wurde und später positiv beschieden wird. Im Zweifel die Zustimmung vorsorglich beantragen (das Integrationsamt erteilt dann ein Negativattest, wenn sie nicht nötig ist).";
       } else if (sechsMonate === "nein") {
         effektiv = "pruefen";
+        schritte = [
+          "Die Zustimmung des Integrationsamts ist nicht nötig. Es gilt die normale Kündigungsfrist.",
+          "Die Schwerbehindertenvertretung vorher unterrichten und anhören, falls es eine gibt (§ 178 Abs. 2 SGB IX). Ohne Anhörung ist die Kündigung unwirksam.",
+          "Die Kündigung dem Integrationsamt innerhalb von 4 Tagen anzeigen (§ 173 Abs. 4 SGB IX).",
+        ];
         zusatz =
           "Das Arbeitsverhältnis besteht noch keine 6 Monate. Die Zustimmung des Integrationsamts ist dann nicht nötig. Die Schwerbehindertenvertretung musst du trotzdem anhören, und die Kündigung musst du dem Integrationsamt innerhalb von 4 Tagen anzeigen.";
       } else if (sechsMonate === "unklar") {
@@ -187,8 +203,27 @@ export function auswerten(a: Record<string, Antwort>, sechsMonate: Antwort): Tre
     } else if (ant === "unklar") {
       zusatz = "Kläre den Sachverhalt vor jeder Kündigung. Behandle den Fall bis dahin so, als bestünde der Schutz.";
     }
-    out.push({ ...s, antwort: ant, effektiv, zusatz });
+    out.push({ ...s, schritte, antwort: ant, effektiv, zusatz });
   }
   const rank = { zustimmung: 0, ausgeschlossen: 1, pruefen: 2 } as const;
   return out.sort((x, y) => rank[x.effektiv] - rank[y.effektiv]);
+}
+
+/** Gesamturteil: Grün erst, wenn alle Fragen beantwortet sind (Review 28.10.2026, A1). Treffer zeigen schon vorher Rot oder Gelb. */
+export function stand(treffer: Treffer[], offen: number): { titel: string; ampel: "rot" | "gelb" | "gruen" | "aus" } {
+  const rot = treffer.filter((t) => t.effektiv !== "pruefen").length;
+  if (treffer.some((t) => t.effektiv === "zustimmung")) return { titel: "Ohne Zustimmung keine Kündigung", ampel: "rot" };
+  if (rot > 0) return { titel: "Ordentliche Kündigung ausgeschlossen", ampel: "rot" };
+  if (treffer.length > 0) return { titel: "Vor der Kündigung klären", ampel: "gelb" };
+  if (offen > 0) return { titel: `Noch nicht vollständig, ${offen} ${offen === 1 ? "Frage" : "Fragen"} offen`, ampel: "aus" };
+  return { titel: "Kein Sonderschutz erkennbar", ampel: "gruen" };
+}
+
+/** Roving Tabindex der Antwort-Gruppen: Ziel-Index für eine Taste, null, wenn die Taste nichts tut. Pfeile laufen im Kreis. */
+export function pfeilZiel(i: number, taste: string, n: number): number | null {
+  if (taste === "ArrowRight" || taste === "ArrowDown") return (i + 1) % n;
+  if (taste === "ArrowLeft" || taste === "ArrowUp") return (i - 1 + n) % n;
+  if (taste === "Home") return 0;
+  if (taste === "End") return n - 1;
+  return null;
 }

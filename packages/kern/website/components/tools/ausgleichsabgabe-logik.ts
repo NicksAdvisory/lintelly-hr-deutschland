@@ -1,4 +1,5 @@
 /** Reine Logik des Ausgleichsabgabe-Rechners (§ 160 SGB IX). */
+import { parseNum } from "./format";
 
 /* ---------- Rechengrößen ---------- */
 
@@ -38,6 +39,21 @@ export const SAETZE: Record<number, Saetze> = {
 export const MONATE = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
 
 /* ---------- reine Logik ---------- */
+
+/**
+ * Monatstabelle lesen (UX-Review 28.10.2026): Ein leeres Feld zählt nicht still als 0, es ist der Fehler "Monat fehlt".
+ * fehler hat Schlüssel wie "ap0" (Plätze Januar) oder "b11" (Schwerbehinderte Dezember).
+ */
+export function leseMonate(apM: string[], bM: string[]) {
+  const fehler: Record<string, string> = {};
+  const lies = (art: "ap" | "b") => (x: string, i: number) => {
+    const n = parseNum(x);
+    if (!x.trim()) fehler[art + i] = "Monat fehlt";
+    else if (n === null || n < 0 || !Number.isInteger(n)) fehler[art + i] = "Ganze Zahl ab 0";
+    return n ?? 0;
+  };
+  return { ap: apM.map(lies("ap")), b: bM.map(lies("b")), fehler };
+}
 
 export const roundHalfUp = (x: number) => Math.floor(x + 0.5 + 1e-9);
 
@@ -102,3 +118,19 @@ export function berechne(ap: number[], b: number[], jahr: number): Ergebnis {
   const abgabe = satz > 0 ? unbesetzt * satz : 0;
   return { avgAP, avgB, pflichtig: true, gruppe, pflichtJeMonat, sumP, sumB, unbesetzt: satz > 0 ? unbesetzt : 0, quote, satz, stufe, abgabe };
 }
+
+/**
+ * Besetzung in Alltagssprache (UX-Review 28.10.2026): "0,08 im Jahresdurchschnitt" versteht niemand,
+ * "1 Person in 1 von 12 Monaten" schon. Nur wenn alle besetzten Monate gleich viele Personen haben.
+ */
+export function besetztText(b: number[]): string {
+  const voll = b.filter((x) => x > 0);
+  const z = (n: number) => `${n} ${n === 1 ? "Person" : "Personen"}`;
+  if (!voll.length) return "niemand";
+  if (voll.every((x) => x === voll[0])) return voll.length === b.length ? `${z(voll[0])} in jedem Monat` : `${z(voll[0])} in ${voll.length} von ${b.length} Monaten`;
+  const sum = b.reduce((x, y) => x + y, 0);
+  return `im Schnitt ${(sum / b.length).toLocaleString("de-DE", { maximumFractionDigits: 2 })} Personen je Monat`;
+}
+
+/** Plausibilität (C9): Monate (Index), in denen mehr Schwerbehinderte als Arbeitsplätze eingetragen sind. */
+export const mehrAlsPlaetze = (ap: number[], b: number[]) => b.flatMap((x, i) => (x > ap[i] ? [i] : []));

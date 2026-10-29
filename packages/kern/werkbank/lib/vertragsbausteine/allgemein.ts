@@ -7,6 +7,7 @@ import { WERTE } from "@/lib/regeln/werte";
 import type { Baustein, Lage, Regel } from "./typen";
 import { hat, leer, minderjaehrig, num, regel, wert, wenn } from "./hilfen";
 import { antwortZuRot, findeGesperrte, ROTE_LISTE } from "./rot";
+import { bausteinSchluessel } from "./kanzlei";
 
 /** Freie Ergänzungen aller gewählten Bausteine mit Kennung. */
 export const ergaenzungen = (l: Lage) => Object.entries(l.auswahl).map(([id, w]) => ({ id, text: (w.ergaenzung ?? "").trim() })).filter((x) => x.text);
@@ -24,7 +25,7 @@ export function allgemeineRegeln(baustein: Record<string, Baustein>): Regel[] {
       return wenn(nass.length > 0, `Unterschrift im Original nötig wegen ${nass.map((b) => `${b.id} ${b.label}`).join(", ")}. Lintelly stellt die Signatur auf „Original“${nass.some((b) => b.id === "M2" || b.id === "M3") ? " und legt ein Übergabeprotokoll für die vom Arbeitgeber unterschriebene Urkunde an" : ""}.`);
     }),
     regel("P-002", "warnung", "Gelber Baustein ohne Freigabe der Kanzlei für diese Version", "Hausregel", [], (l) => {
-      const offen = gewaehlt(l).filter((b) => b.risiko === "gelb" && !l.freigaben?.[`${b.id}@${b.version}`]);
+      const offen = gewaehlt(l).filter((b) => b.risiko === "gelb" && !l.freigaben?.[bausteinSchluessel(b.id, b.version)]);
       return wenn(offen.length > 0, `Kanzlei prüfen: ${offen.map((b) => `${b.id} (Version ${b.version})`).join(", ")} ist noch nicht von eurer Kanzlei freigegeben. Export nur nach Bestätigung.`);
     }),
     regel("P-003", "warnung", "Freitext in einem strukturierten Baustein ist ungeprüft", "Hausregel", [], (l) => {

@@ -3,11 +3,11 @@
  * Gerechnet wird nur mit der Logik der Website (packages/kern/website/components/tools/*-logik.ts), Texte und Warnungen
  * folgen den Seiten. Fehlerhafte Angaben kommen als ergebnis.fehler zurück, nicht als Zahl.
  */
-import { berechneEfz, type FallErgebnis } from "../../../kern/website/components/tools/entgeltfortzahlung-logik";
+import { berechneEfz, krankengeldText, ueber78Wochen, wiederVollText, type FallErgebnis } from "../../../kern/website/components/tools/entgeltfortzahlung-logik";
 import { berechneBem } from "../../../kern/website/components/tools/bem-logik";
 import { anspruchImAustrittsjahr, tagessatz, type AnspruchErgebnis } from "../../../kern/website/components/tools/urlaubsabgeltung-logik";
-import { berechneAbfindung } from "../../../kern/website/components/tools/abfindung-logik";
-import { berechne as ausgleich, SAETZE } from "../../../kern/website/components/tools/ausgleichsabgabe-logik";
+import { berechneAbfindung, KEIN_ANSPRUCH } from "../../../kern/website/components/tools/abfindung-logik";
+import { berechne as ausgleich, besetztText, mehrAlsPlaetze, MONATE, SAETZE } from "../../../kern/website/components/tools/ausgleichsabgabe-logik";
 import { abgabenArbeitgeber, berechneMinijob, MIDIJOB_OBERGRENZE, STAND, WOCHEN_PRO_MONAT, type Basis, type Jahr } from "../../../kern/website/components/tools/minijob-logik";
 import { addDays, diffDays, fmt, fmtDay, parseYmd, toDay, toYmd } from "../../../kern/website/components/tools/datum";
 import { eur, plural, zahl as dz, zahlFest } from "../../../kern/website/components/tools/format";
@@ -44,7 +44,7 @@ const fallText = (f: FallErgebnis) =>
   `Zeitraum ${f.nrs.join(" + ")} (${fmt(f.von)} bis ${fmt(f.bis)}): ${f.grund} `
   + (f.efzVon ? `Entgeltfortzahlung ${fmt(f.efzVon)} bis ${fmt(f.efzBis)}, ${plural(f.bezahlt, "Tag", "Tage")}.` : "Keine Entgeltfortzahlung.")
   + (f.wartezeitTage ? ` ${plural(f.wartezeitTage, "Tag", "Tage")} in der Wartezeit.` : "")
-  + (f.kgAb ? ` Krankengeld der Krankenkasse ab ${fmt(f.kgAb)}.` : "");
+  + (f.kgAb || f.kgWartezeit ? ` Krankengeld der Krankenkasse: ${krankengeldText(f)}.` : "");
 
 const entgeltfortzahlung: Werkzeug = {
   name: "entgeltfortzahlung",
@@ -109,9 +109,7 @@ const entgeltfortzahlung: Werkzeug = {
         `Anspruch ab ${fmt(anspruchAb)}: 4 Wochen nach Beginn des Arbeitsverhältnisses (§ 3 Abs. 3 EFZG).`,
         "Je Erkrankung zahlst du bis zu 6 Wochen, das sind 42 Kalendertage. Dieselbe Erkrankung bekommt neue 6 Wochen nach 6 Monaten ohne sie oder 12 Monate nach Beginn der ersten Arbeitsunfähigkeit (§ 3 Abs. 1 Satz 2 EFZG).",
         ...a.map(fallText),
-        ...(letzter.rest < 42 && letzter.naechsterVoll && letzter.sechsMonateAb
-          ? [`Wieder volle 6 Wochen für diese Erkrankung: spätestens bei einer neuen Arbeitsunfähigkeit ab ${fmt(letzter.naechsterVoll)} (12 Monate nach Beginn der ersten). Früher, wenn bis ${fmt(addDays(letzter.sechsMonateAb, -1))} keine Arbeitsunfähigkeit wegen dieser Erkrankung dazukommt: dann ab ${fmt(letzter.sechsMonateAb)}.`]
-          : []),
+        ...(letzter.rest < 42 && letzter.naechsterVoll ? [`Wieder volle 6 Wochen für diese Erkrankung: ${wiederVollText(letzter, parseYmd(heute)!)}`] : []),
       ],
       quellen: [
         registerQuelle("entgeltfortzahlungTage", heute),
@@ -129,6 +127,7 @@ const entgeltfortzahlung: Werkzeug = {
           ? ["Direkter Anschluss ohne Arbeitstag: Das ist ein Fall mit einmal 6 Wochen. Das Bundesarbeitsgericht vermutet dann, dass die erste Arbeitsunfähigkeit noch andauerte (BAG, 11.12.2019, 5 AZR 505/18). Neue 6 Wochen gibt es nur, wenn die Person beweist, dass die erste vorher geendet hat. Feiertage kennt die Rechnung nicht, nur Wochenenden."]
           : []),
         ...(a.some((f) => f.wartezeitTage) ? ["In den ersten 4 Wochen des Arbeitsverhältnisses zahlst du nichts. Bei gesetzlich Versicherten zahlt die Krankenkasse Krankengeld."] : []),
+        ...(ueber78Wochen(a) ? ["Ein Zeitraum ist länger als 78 Wochen. Krankengeld zahlt die Krankenkasse wegen derselben Krankheit höchstens 78 Wochen innerhalb von 3 Jahren (§ 48 SGB V). Prüf die Daten, vor allem das Jahr."] : []),
       ],
       naechster_schritt: [
         `U1-Erstattung beantragen: Bei in der Regel höchstens 30 Beschäftigten erstattet dir die Krankenkasse über die Umlage U1 einen Teil des fortgezahlten Entgelts${bezahlt ? ` für die ${bezahlt} Tage` : ""} (§ 1 AAG). Wie viel, hängt vom Erstattungssatz ab, den du bei der Krankenkasse gewählt hast. Den Antrag stellt meist dein Lohnbüro.`,
@@ -250,6 +249,7 @@ const STUFEN: Record<number, string> = {
   0.75: "Kündigung angreifbar, z. B. Sozialauswahl oder Abmahnung fraglich",
   1: "Kündigung voraussichtlich unwirksam, z. B. Fehler bei der Anhörung des Betriebsrats",
   1.5: "schwache Position: Kündigung kaum haltbar, Sonderkündigungsschutz, Lohnnachzahlung bei langem Verfahren droht",
+  2: "Ausnahme: sehr hohes Prozessrisiko oder besonderer Wunsch nach schneller Einigung",
 };
 
 /** Die Logik liest deutsche Texte: 4200.5 wird "4200,5". */
@@ -299,6 +299,7 @@ const abfindung_faustformel: Werkzeug = {
       quellen: [normQuelle("§ 1a KSchG"), normQuelle("§ 9 KSchG"), normQuelle("§ 10 KSchG"), registerQuelle("kschgWartezeitMonate", heute), registerQuelle("kschgSchwelle", heute)],
       fallen: [
         ...r.msgs.map((m) => `${m.title}: ${m.text}`),
+        `Kein gesetzlicher Anspruch: ${KEIN_ANSPRUCH}`,
         "Eine echte Abfindung ist frei von Sozialversicherungsbeiträgen, aber lohnsteuerpflichtig. Seit 2025 zieht das Lohnbüro die volle Lohnsteuer ab, die Fünftelregelung bekommt die Person erst über ihre Steuererklärung.",
         "Ob die Agentur für Arbeit eine Sperrzeit verhängt oder das Arbeitslosengeld ruhen lässt, hängt vor allem davon ab, ob die Kündigungsfrist eingehalten wurde und wer die Trennung ausgelöst hat.",
       ],
@@ -331,6 +332,7 @@ const ausgleichsabgabe: Werkzeug = {
     if (ap.every((x) => x === 0)) return fehler("Trag für mindestens einen Monat Arbeitsplätze ein.", heute);
     const r = ausgleich(ap, b, jahr);
     const ersparnis = r.abgabe - ausgleich(ap, b.map((x) => x + 1), jahr).abgabe;
+    const zuViele = mehrAlsPlaetze(ap, b);
     const faellig = `${jahr + 1}-03-31`, faelligDe = `31.03.${jahr + 1}`;
     const gruppe = { unter20: "", unter40: "20 bis unter 40 Arbeitsplätze: 1 Pflichtplatz je Monat.", unter60: "40 bis unter 60 Arbeitsplätze: 2 Pflichtplätze je Monat.", regel: "Ab 60 Arbeitsplätzen: 5 % je Monat, ab 0,5 aufgerundet." }[r.gruppe];
     return antwort({
@@ -355,7 +357,7 @@ const ausgleichsabgabe: Werkzeug = {
         ...(r.pflichtig
           ? [
             `${gruppe} Zusammen ${r.sumP} Pflichtplatz-Monate im Jahr.`,
-            `Besetzt im Jahresdurchschnitt: ${dz(r.avgB)}, Quote ${dz(r.quote)} %. Stufe: ${r.stufe}.`,
+            `Besetzt (angerechnet): ${besetztText(b)}, im Jahresdurchschnitt ${dz(r.avgB)}, Quote ${dz(r.quote)} %. Stufe: ${r.stufe}.`,
             ...(r.satz ? [`${r.unbesetzt} unbesetzte Pflichtplatz-Monate × ${eur(r.satz)} = ${eur(r.abgabe)}.`] : []),
             `Beträge ${jahr}: ${SAETZE[jahr].quelle}.`,
           ]
@@ -367,6 +369,7 @@ const ausgleichsabgabe: Werkzeug = {
       ],
       fallen: [
         "Arbeitsplätze: Stellen ab 18 Wochenstunden, ohne Auszubildende und ohne Befristungen bis 8 Wochen. Schwerbehinderte Auszubildende zählen doppelt, Mehrfachanrechnungen der Agentur für Arbeit zählst du mit.",
+        ...(zuViele.length ? [`${zuViele.length === 12 ? "In jedem Monat" : `In ${zuViele.map((i) => MONATE[i]).join(", ")}`} stehen mehr Schwerbehinderte als Arbeitsplätze. Das geht nur mit Mehrfachanrechnungen. Prüf sonst die Zahlen.`] : []),
         ...(r.pflichtig && r.abgabe === 0 ? ["Die Pflicht ist erfüllt. Die Anzeige an die Agentur für Arbeit musst du trotzdem abgeben."] : []),
         ...(!r.pflichtig && r.avgAP >= 15 ? ["Knapp unter der Schwelle: Wächst die Firma, prüf die Pflicht jedes Jahr neu. Maßgeblich ist der Jahresdurchschnitt."] : []),
         "Nicht berechnet: Aufträge an anerkannte Werkstätten für behinderte Menschen oder Inklusionsbetriebe können die Abgabe mindern (§ 223 SGB IX).",
@@ -455,8 +458,10 @@ const minijob: Werkzeug = {
         ...(r.unterMindestlohn && !minderjaehrig
           ? [`${eur(lohn)} liegt ${eur(r.differenz)} unter dem Mindestlohn von ${eur(r.mindestlohn)}. Der Mindestlohn gilt auch im Minijob. Bei ${eur(r.mindestlohn)} wären höchstens ${zahlFest(Math.floor((r.grenze / r.mindestlohn) * 100) / 100)} Stunden im Monat möglich.`]
           : []),
-        ...(r.imMinijob === false
+        ...(r.grund === "monat"
           ? [`Übergangsbereich statt Minijob: Über ${eur(r.grenze)} im Monat ist die Stelle sozialversicherungspflichtig. Bis ${eur(MIDIJOB_OBERGRENZE)} gilt der Übergangsbereich (Midijob, Stand 2026) mit reduzierten Beiträgen für die beschäftigte Person. Sag deinem Lohnbüro vor dem Start Bescheid.`]
+          : r.grund === "jahr"
+          ? [`Die Einmalzahlung kippt den Minijob: Im Monat bleibst du mit ${eur(r.monatsEntgelt!)} unter ${eur(r.grenze)}. Mit ${eur(einmal)} Einmalzahlung kommt das Jahr aber auf ${eur(r.jahresEntgelt!)}, mehr als die Jahresgrenze von ${eur(r.jahresGrenze)}. Damit ist die Stelle sozialversicherungspflichtig, im Übergangsbereich (Midijob, Stand 2026). Den Minijob hältst du mit höchstens ${eur(r.spielraum!)} Einmalzahlung im Jahr. Sag deinem Lohnbüro vor dem Start Bescheid.`]
           : []),
         ...(jahr !== 2026
           ? ["Abgaben 2027 noch offen: Ab 01.01.2027 steigt die Pauschale zur Krankenversicherung von 13 % auf 14,6 % plus den durchschnittlichen Zusatzbeitrag (GKV-Beitragssatzstabilisierungsgesetz). Der Zusatzbeitrag für 2027 wird erst im Herbst festgelegt. Mit jahr 2026 siehst du die Kosten mit den heutigen Sätzen."]

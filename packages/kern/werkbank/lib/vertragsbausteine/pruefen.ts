@@ -1,39 +1,14 @@
 /**
- * Prüfung eines Vertrags mit Bausteinen: Eingaben je Baustein (Pflicht, Auswahl, Grenzen), Vertragsart, alle Regeln P-001 bis P-104
+ * Prüfung eines Vertrags mit Bausteinen: Eingaben je Baustein (Pflicht, Auswahl, Grenzen), Vertragsart, alle Regeln P-001 bis P-108
  * und Sperrkombinationen K-01 bis K-40. Läuft in der Vorprüfung des Dialogs, beim Anlegen auf dem Server und vor der Freigabe.
- * Sperre: Das Dokument entsteht nicht und lässt sich nicht freigeben. Warnung und Hinweis: in der Prüfliste. Rein, ohne Datenbank.
+ * Sperre: Das Dokument entsteht nicht und lässt sich nicht freigeben. Warnung und Hinweis: in der Prüfliste. Ohne Datenbank, nur auf dem
+ * Server (Fehlerlog); was der Dialog im Browser braucht, steht in ./eingabe.ts.
  */
-import { isISODate } from "@/lib/regeln/datum";
 import type { Beschaeftigung, Person } from "@/lib/types";
-import type { Auswahl, Befund, Feld, Lage, Vertragsart, Werte } from "./typen";
+import type { Auswahl, Befund, Lage, Vertragsart } from "./typen";
 import { BAUSTEIN, REGELN } from "./katalog";
-import { leseStaffel, zahl } from "./hilfen";
-
-export const feldSichtbar = (f: Feld, w: Werte) => !f.bei || Object.entries(f.bei).every(([k, werte]) => werte.includes(w[k] ?? ""));
-
-/** Fehler in den Eingaben eines Bausteins (leer = in Ordnung). */
-export function eingabeFehler(id: string, w: Werte): string[] {
-  const b = BAUSTEIN[id];
-  if (!b) return [`Unbekannter Baustein ${id}`];
-  const out: string[] = [];
-  for (const f of b.felder) {
-    if (!feldSichtbar(f, w)) continue;
-    const v = (w[f.id] ?? "").trim();
-    if (!v) { if (f.pflicht) out.push(`${id}: „${f.label}“ fehlt`); continue; }
-    if (f.typ === "auswahl" && f.optionen && !f.optionen.includes(v)) out.push(`${id}: ungültige Auswahl bei „${f.label}“`);
-    if (f.typ === "mehrfach" && f.optionen && v.split("|").some((x) => !f.optionen!.includes(x.trim()))) out.push(`${id}: ungültige Auswahl bei „${f.label}“`);
-    if (f.typ === "janein" && !["ja", "nein"].includes(v)) out.push(`${id}: „${f.label}“ bitte ja oder nein`);
-    if (f.typ === "datum" && !isISODate(v)) out.push(`${id}: „${f.label}“ ist kein gültiges Datum`);
-    if (f.typ === "staffel" && !leseStaffel(v).length) out.push(`${id}: „${f.label}“ braucht mindestens eine Stufe`);
-    if (f.typ === "zahl" || f.typ === "betrag" || f.typ === "prozent") {
-      const n = zahl(v);
-      if (n === null) out.push(`${id}: „${f.label}“ ist keine Zahl`);
-      else if (f.min !== undefined && n < f.min) out.push(`${id}: „${f.label}“ mindestens ${String(f.min).replace(".", ",")}`);
-      else if (f.max !== undefined && n > f.max) out.push(`${id}: „${f.label}“ höchstens ${String(f.max).replace(".", ",")}`);
-    }
-  }
-  return out;
-}
+import { eingabeFehler } from "./eingabe";
+import { logFehler } from "@/lib/fehler";
 
 export type Pruefergebnis = { befunde: Befund[]; gesperrt: boolean; nass: boolean };
 
@@ -47,9 +22,11 @@ export function pruefeVertrag(l: Lage): Pruefergebnis {
   }
   for (const r of REGELN) {
     if (r.bausteine.length && !r.bausteine.some((id) => id in l.auswahl)) continue;
-    let text: string | null = null;
-    try { text = r.pruefe(l); } catch { text = null; }
-    if (text) befunde.push({ regel: r.id, art: r.art, text, norm: r.norm, bausteine: r.bausteine.filter((id) => id in l.auswahl) });
+    let text: string | null;
+    let art = r.art;
+    // Eine Regel, die nicht rechnen kann, gilt nicht als „kein Fund“: sie sperrt, bis der Fehler behoben ist (Review 23.10.2026 B10).
+    try { text = r.pruefe(l); } catch (e) { logFehler(`Vertragsbaustein-Regel ${r.id}`, e); text = `Regel ${r.id} konnte nicht geprüft werden`; art = "sperre"; }
+    if (text) befunde.push({ regel: r.id, art, text, norm: r.norm, bausteine: r.bausteine.filter((id) => id in l.auswahl) });
   }
   return { befunde, gesperrt: befunde.some((b) => b.art === "sperre"), nass: Object.keys(l.auswahl).some((id) => BAUSTEIN[id]?.nass) };
 }

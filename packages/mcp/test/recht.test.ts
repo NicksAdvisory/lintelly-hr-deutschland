@@ -16,7 +16,7 @@ describe("rechtswert", () => {
   });
   it("eigene Annahmen von Lintelly (Rhythmus Lintelly) sind nicht öffentlich", () => {
     const alle = rufe("rechtswerte_suchen", { suchtext: "" }).ergebnis.anzahl_gesamt;
-    expect(alle).toBe(215);
+    expect(alle).toBe(217);
   });
 });
 

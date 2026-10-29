@@ -29,8 +29,8 @@ describe("vertragsbaustein", () => {
     expect(a.ergebnis.text).toBeNull();
     expect(a.ergebnis.fehlende_angaben.length).toBeGreaterThan(0);
   });
-  it("alle 126 Bausteine gibt es, jeder mit Text, sobald die Pflichtangaben da sind, ohne undefined oder NaN", () => {
-    expect(BAUSTEINE).toHaveLength(126);
+  it("alle 127 Bausteine gibt es, jeder mit Text, sobald die Pflichtangaben da sind, ohne undefined oder NaN", () => {
+    expect(BAUSTEINE).toHaveLength(127);
     for (const b of BAUSTEINE) {
       const ohne = rufe("vertragsbaustein", { kennung: b.id }).ergebnis;
       const angaben = ohne.fehlende_angaben.filter((f: { feld: string }) => f.feld !== "gehalt_monat" && f.feld !== "wochenstunden" && f.feld !== "eintritt")

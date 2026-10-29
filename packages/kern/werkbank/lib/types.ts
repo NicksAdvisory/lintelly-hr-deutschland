@@ -181,7 +181,13 @@ export type Vorgang = {
   vertraulich?: string;
 };
 
-export type Variante = { id: string; titel: string; folgen: string[]; empfohlen?: boolean; nurInfo?: boolean };
+export type Variante = {
+  id: string; titel: string; folgen: string[]; empfohlen?: boolean; nurInfo?: boolean;
+  /** Was nach dem Klick passiert, wenn es nicht der Weg über Unterlagen und Unterschrift ist (z. B. "Geht sofort an Felix in Mein Lintelly"). */
+  danach?: string;
+  /** Ohne eigenen Grund in der Notiz lehnt der Server ab: der Grund steht wörtlich im Schreiben. */
+  grundPflicht?: boolean;
+};
 
 export type Entscheidung = {
   id: string;
@@ -229,11 +235,15 @@ export type Aufgabe = {
   erledigtAm?: ISODate;
   /** Chat, in den eine freigegebene Antwort zurückgeht. */
   chatId?: string;
+  /** Gesprächsabschnitt vor der Frage, als Kopie bei der Übergabe, damit die HR-Leitung Rückfragen wie "ja genau sophie" versteht (Nick 24.10.2026). */
+  verlauf?: { von: ChatNachricht["von"]; text: string; ts: string }[];
   kommentar?: string;
   /** Aus einem Befund entstanden (z. B. von der Geschäftsführung weitergegeben). Das Ergebnis wird am Befund angezeigt. */
   befundId?: string;
   /** Nur die HR-Leitung darf Inhalt und Beteiligte sehen (z. B. Hinweisgebermeldung, § 8 HinSchG). Die Geschäftsführung sieht eine neutrale Seite. */
   nurHr?: boolean;
+  /** Freigabe-Schritt eines Workflows: freigeben oder ablehnen, abgelehnt endet der Workflow (Nick 24.10.2026). */
+  workflowFreigabe?: boolean;
   /** Die Geschäftsführung möchte das Ergebnis wissen: Abschluss nur mit kurzer Rückmeldung. */
   rueckmeldung?: boolean;
   /** Die Aufgabe fragt das tatsächliche Zugangsdatum ab (Übergabe der Kündigung). Ohne Datum keine Freigabe. */
@@ -290,12 +300,18 @@ export type DokumentTyp =
   | "kuendigung-ordentlich" | "kuendigung-fristlos" | "aufhebungsvertrag" | "elternzeit-bestaetigung" | "teilzeit-gespraech" | "teilzeit-ablehnung"
   | "befristungsverlaengerung" | "werkstudentenvertrag" | "ausbildungsvertrag" | "freelancervertrag" | "erfindungsmeldung" | "praktikumsvertrag"
   | "verzicht-wettbewerb" | "wiedereingliederungsplan" | "entgeltumwandlung" | "nebentaetigkeit-bescheid"
-  | "arbeitsmittel-uebergabe" | "arbeitsmittel-rueckgabe" | "dienstwagen-ueberlassung" | "kostenbeteiligung";
+  | "arbeitsmittel-uebergabe" | "arbeitsmittel-rueckgabe" | "dienstwagen-ueberlassung" | "kostenbeteiligung"
+  | "beschaeftigungsbestaetigung" | "unbezahlter-urlaub" | "rufbereitschaft-nachtrag" | "austrittsbestaetigung";
 
 /** "verworfen": zurückgezogener Entwurf (Dokumente Nr. 15), bleibt für das Protokoll, fehlt in Liste und Doppelt-Prüfung. */
 export type DokumentStatus = "entwurf" | "pruefung" | "freigegeben" | "unterschrieben-gf" | "versendet" | "geoeffnet" | "abgeschlossen" | "verworfen";
 
-export type Abschnitt = { ueberschrift: string; text: string };
+/**
+ * Englische Fassung eines Abschnitts (Zweisprachigkeit, Nick 23.10.2026): feste Texte aus Vorlage und Baustein. `ki`: freie Eingaben
+ * darin hat die KI übersetzt (sichtbar markiert). `offen`: freie Eingabe ohne Übersetzung oder deutscher Text danach geändert.
+ */
+export type AbschnittEn = { ueberschrift: string; text: string; ki?: boolean; offen?: boolean };
+export type Abschnitt = { ueberschrift: string; text: string; en?: AbschnittEn };
 
 export type Dokument = {
   id: string;
@@ -306,6 +322,8 @@ export type Dokument = {
   version: number;
   /** Betreff bei Briefen (DIN 5008). */
   betreff?: string;
+  /** Englischer Betreff bei zweisprachigen Briefen. */
+  betreffEn?: string;
   abschnitte: Abschnitt[];
   pruefliste: Pruefpunkt[];
   erstellt: string;
@@ -315,7 +333,7 @@ export type Dokument = {
   eingaben?: Record<string, string>;
   versionen: { version: number; ts: string; wer: string; notiz: string; abschnitte: Abschnitt[] }[];
   /** Die Unterschrift gilt nur für genau eine Fassung: Version und Prüfwert des Inhalts stehen dabei (Dokumente Nr. 2). */
-  signatur?: { gf?: { name: string; ts: string; version?: number; hash?: string }; empfaenger?: { name: string; ts: string } };
+  signatur?: { gf?: { name: string; ts: string; version?: number; hash?: string }; empfaenger?: { name: string; ts: string; papier?: true } };
   /** Wer schreibt, wenn keine Unterschrift der Geschäftsführung nötig ist (Glückwunsch, Hinweis): dann unterschreibt diese Stelle (Feedback Nick 14.10.2026 Nr. 24). */
   absender?: "gf" | "hr";
   /** Datum des Schreibens (Dokumente Nr. 10). Ohne Angabe: Tag der Unterschrift der Geschäftsführung, vorher der heutige Tag. */
@@ -360,6 +378,8 @@ export type ChatNachricht = {
   weitere?: { anzahl: number; href: string };
   /** Quellen mit Ziel, soweit eines bekannt ist (Profil, Handbuchabschnitt, Normtext). */
   quellenLinks?: { label: string; href: string }[];
+  /** Nächste Schritte als Knöpfe (z. B. "Kündigung für Marie vorbereiten"), nur feste Ziele in der App. */
+  aktionen?: { label: string; href: string }[];
   /** Lintelly hat zurückgefragt und wartet auf Ja oder Nein (z. B. "Meinst du einen Unfall bei der Arbeit?"). */
   offeneFrage?: { art: "unfall"; text: string };
   /** Antwort der HR-Leitung, die die Person noch nicht gesehen hat. */

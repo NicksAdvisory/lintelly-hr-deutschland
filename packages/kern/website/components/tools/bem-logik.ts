@@ -84,3 +84,25 @@ export function berechneBem(perioden: { von: number; bis: number | null }[], sti
     tage,
   };
 }
+
+/** Abstand zur Grenze, die näher liegt: "noch 1 Arbeitstag" oder "noch 13 Kalendertage". */
+export function abstandText(r: BemErgebnis): string {
+  const k = Math.max(0, 43 - r.kalendertage);
+  const a = r.schwelleArbeitstage > 0 ? Math.max(0, r.schwelleArbeitstage + 1 - r.arbeitstage) : Infinity;
+  return a < k ? `noch ${a} ${a === 1 ? "Arbeitstag" : "Arbeitstage"}` : `noch ${k} ${k === 1 ? "Kalendertag" : "Kalendertage"}`;
+}
+
+/** Warum es noch kein Ergebnis gibt. Der echte Grund statt immer "Noch keine Zeiten". */
+export function leerGrund(o: { stichtagOk: boolean; proWoche: number; gueltig: number; fehler: string[] }): { titel: string; text: string } {
+  if (!o.stichtagOk) return { titel: "Stichtag fehlt", text: "Trag einen gültigen Stichtag ein. Gezählt werden die 12 Monate davor." };
+  if (o.proWoche === 0) return { titel: "Keine Arbeitstage", text: "Wähle mindestens einen Arbeitstag der Person." };
+  if (o.gueltig === 0 && o.fehler.length) return { titel: "Angaben prüfen", text: o.fehler.join(" ") };
+  return { titel: "Noch keine Zeiten", text: "Trag mindestens einen Zeitraum der Arbeitsunfähigkeit ein. Das Ergebnis erscheint sofort." };
+}
+
+/**
+ * Stichtag in der Zukunft und ein Zeitraum ohne Ende (UX-Review 28.10.2026): Der Rechner zählt den offenen Zeitraum
+ * bis zum Stichtag weiter. Das ist eine Hochrechnung, kein Ist-Stand. Tage als Zahl wie in toDay.
+ */
+export const hochrechnung = (perioden: { von: number; bis: number | null }[], stichtag: number, heute: number) =>
+  stichtag > heute && perioden.some((p) => p.bis === null && p.von <= stichtag);

@@ -16,6 +16,8 @@ export type FallErgebnis = {
   efzVon: Date | null;
   efzBis: Date | null;
   kgAb: Date | null;
+  /** Krankengeld der Krankenkasse für die Tage in der Wartezeit */
+  kgWartezeit: { von: Date; bis: Date } | null;
   rest: number;
   neuerAnspruch: boolean;
   grund: string;
@@ -80,8 +82,10 @@ export function berechneEfz(beginn: Date, perioden: Periode[]): FallErgebnis[] {
     }
     let zaehlStart = f.angefangen ? addDays(f.von, 1) : f.von;
     let wartezeitTage = 0;
+    let kgWartezeit: FallErgebnis["kgWartezeit"] = null;
     if (zaehlStart < anspruchAb) {
       wartezeitTage = Math.max(0, Math.min(diffDays(zaehlStart, anspruchAb), diffDays(zaehlStart, f.bis) + 1));
+      if (wartezeitTage > 0) kgWartezeit = { von: zaehlStart, bis: addDays(zaehlStart, wartezeitTage - 1) };
       zaehlStart = anspruchAb;
     }
     const verfuegbar = Math.max(0, BUDGET - kette.verbraucht);
@@ -97,7 +101,7 @@ export function berechneEfz(beginn: Date, perioden: Periode[]): FallErgebnis[] {
     // Tage in der Wartezeit: Krankengeld der Krankenkasse statt Entgeltfortzahlung (gesetzlich Versicherte)
     if (wartezeitTage > 0 && !efzVon) kgAb = f.angefangen ? addDays(f.von, 1) : f.von;
     return {
-      nrs: f.nrs, von: f.von, bis: f.bis, gruppe: f.gruppe, zaehlStart, bezahlt, efzVon, efzBis, kgAb,
+      nrs: f.nrs, von: f.von, bis: f.bis, gruppe: f.gruppe, zaehlStart, bezahlt, efzVon, efzBis, kgAb, kgWartezeit,
       rest: BUDGET - kette.verbraucht, neuerAnspruch, grund, wartezeitTage,
       zusammengefasst: f.zusammengefasst, direktAnschluss: f.direktAnschluss,
       naechsterVoll: addDays(periodEnd(kette.start, 12), 1),
@@ -105,3 +109,28 @@ export function berechneEfz(beginn: Date, perioden: Periode[]): FallErgebnis[] {
     };
   });
 }
+
+/** Wann die Krankenkasse Krankengeld zahlt, Wartezeit und Zeit nach den 6 Wochen zusammen. */
+export function krankengeldText(f: FallErgebnis): string {
+  const w = f.kgWartezeit;
+  if (!w) return f.kgAb ? `ab ${fmt(f.kgAb)}` : "nicht nötig";
+  // ohne Entgeltfortzahlung durchgehend Krankengeld
+  if (!f.efzVon && f.bis > w.bis) return `ab ${fmt(w.von)}`;
+  const t = `${fmt(w.von)} bis ${fmt(w.bis)} (Wartezeit)`;
+  return f.efzVon && f.kgAb ? `${t}, wieder ab ${fmt(f.kgAb)}` : t;
+}
+
+/** Text zu "Wieder volle 6 Wochen", mit "seit" für Daten, die schon vorbei sind. */
+export function wiederVollText(f: FallErgebnis, heute: Date): string {
+  const zwoelf = f.naechsterVoll!;
+  const sechs = f.sechsMonateAb && f.sechsMonateAb < zwoelf ? f.sechsMonateAb : null;
+  if (zwoelf <= heute) return `Eine neue Arbeitsunfähigkeit wegen dieser Erkrankung bekommt wieder volle 6 Wochen: Seit dem ${fmt(zwoelf)} sind 12 Monate seit Beginn der ersten vergangen.`;
+  if (sechs && sechs <= heute) return `Seit dem ${fmt(sechs)} bekommt eine neue Arbeitsunfähigkeit wegen dieser Erkrankung wieder volle 6 Wochen, wenn seit dem ${fmt(f.bis)} keine weitere dazukam. Sonst spätestens ab ${fmt(zwoelf)} (12 Monate nach Beginn der ersten).`;
+  return `Spätestens bei einer neuen Arbeitsunfähigkeit ab ${fmt(zwoelf)} (12 Monate nach Beginn der ersten).${sechs ? ` Früher, wenn bis ${fmt(addDays(sechs, -1))} keine Arbeitsunfähigkeit wegen dieser Erkrankung dazukommt: dann ab ${fmt(sechs)}.` : ""}`;
+}
+
+/**
+ * Plausibilität (UX-Review 28.10.2026, C9): Krankengeld gibt es wegen derselben Krankheit höchstens 78 Wochen
+ * innerhalb von 3 Jahren (§ 48 Abs. 1 SGB V). Ein einzelner Fall darüber ist selten und oft ein Tippfehler im Jahr.
+ */
+export const ueber78Wochen = (faelle: FallErgebnis[]) => faelle.some((f) => diffDays(f.von, f.bis) + 1 > 78 * 7);

@@ -1,7 +1,7 @@
 /** Reine Logik des Befristungs-Rechners (§ 14 TzBfG, § 41 Abs. 2 SGB VI). */
 import type { Level } from "./ui";
 import { plural } from "./format";
-import { addDays, fmt, parseYmd, periodEnd, ymd } from "./datum";
+import { addDays, diffDays, fmt, parseYmd, periodEnd, ymd } from "./datum";
 
 export type Vorbesch = "nein" | "arbeit" | "azubi" | "praktikum" | "leih";
 export type Schrift = "ja" | "nein" | "unklar";
@@ -126,4 +126,14 @@ export function nummern(verl: Verl[]) {
   let n = 0;
   for (const v of verl) if (v.am || v.bis) out[v.id] = ++n;
   return out;
+}
+
+/**
+ * Spielraum bis zur Höchstdauer, lesbar gemacht (Design-Review 28.10.2026: "1188 Tage" allein sagt wenig).
+ * Ab 2 Monaten in ganzen Monaten (abgerundet), darunter in Tagen.
+ */
+export function spielraumText(aktEnde: Date, maxEnde: Date): { wert: string; unter: string } {
+  const tage = Math.max(0, diffDays(aktEnde, maxEnde));
+  const monate = Math.floor(tage / 30.44);
+  return monate >= 2 ? { wert: `${monate} Monate`, unter: `${tage.toLocaleString("de-DE")} Tage, bis ${fmt(maxEnde)}` } : { wert: plural(tage, "Tag", "Tage"), unter: `bis ${fmt(maxEnde)}` };
 }

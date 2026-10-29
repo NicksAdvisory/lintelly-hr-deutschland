@@ -1,6 +1,7 @@
 /** Reine Logik des Elternzeit-Fristenrechners (§§ 15 bis 18 BEEG). */
 import { addMonthsDay, addYearsDay, fmtDay, partsDay, toDay } from "./datum";
 import { nachfristTage } from "./mutterschutz-logik";
+import { plural } from "./format";
 
 export type EzEingabe = {
   geburt: number;
@@ -13,6 +14,8 @@ export type EzEingabe = {
   zugang: number | null;
   teilzeit: boolean;
   urlaub: number | null;
+  /** heutiger Tag, für den Hinweis auf eine schon verpasste Antragsfrist */
+  heute?: number;
 };
 
 export type Abschnitt = { von: number; bis: number; ab3: boolean; fristWochen: 7 | 13; spaetesterZugang: number; schutzFruehestens: number };
@@ -27,11 +30,22 @@ export type EzErgebnis = {
   schutzAb: number | null;
   zuSpaet: boolean;
   fruehesterBeginnBeiZugang: number | null;
+  /** Ohne eingetragenen Antrag: Die Frist für den sicher rechtzeitigen Antrag liegt vor heute */
+  fristVorbei: boolean;
+  /** Geht der Antrag heute zu, beginnt die Elternzeit ohne Einigung frühestens an diesem Tag */
+  fruehesterBeginnAbHeute: number | null;
   monateGesamt: { monate: number; tage: number };
   kuerzung: { jahr: number; monate: number; tage: number }[];
   fehler: string[];
   warnungen: string[];
 };
+
+/** Dauer als Text: "1 Tag", "1 Monat", "12 Monate, 3 Tage" */
+export function dauerText(d: { monate: number; tage: number }) {
+  return [d.monate ? plural(d.monate, "Monat", "Monate") : "", d.tage ? plural(d.tage, "Tag", "Tage") : ""].filter(Boolean).join(", ") || "0 Tage";
+}
+
+export const volleMonateText = (n: number) => (n === 1 ? "1 voller Monat" : `${n} volle Monate`);
 
 /** volle Monate und Resttage zwischen a und b (b inklusive) */
 export function dauer(a: number, b: number) {
@@ -99,6 +113,8 @@ export function berechneElternzeit(e: EzEingabe): EzErgebnis {
   const ersterSchutz = abschnitte.length ? abschnitte[0].schutzFruehestens : e.beginn - 56;
   const zuSpaet = e.zugang !== null && abschnitte.length > 0 && e.zugang > abschnitte[0].spaetesterZugang;
   const fruehesterBeginnBeiZugang = e.zugang !== null ? e.zugang + (abschnitte[0]?.fristWochen ?? 7) * 7 + 1 : null;
+  const fristVorbei = e.zugang === null && e.heute !== undefined && abschnitte.length > 0 && e.heute > abschnitte[0].spaetesterZugang;
+  const fruehesterBeginnAbHeute = fristVorbei ? e.heute! + abschnitte[0].fristWochen * 7 + 1 : null;
   const schutzAb = e.zugang !== null ? Math.max(e.zugang, ersterSchutz) : null;
 
   if (e.zugang !== null && e.zugang > e.beginn) warnungen.push("Der Antrag ist erst nach dem gewünschten Beginn eingegangen.");
@@ -119,6 +135,8 @@ export function berechneElternzeit(e: EzEingabe): EzErgebnis {
     schutzAb,
     zuSpaet,
     fruehesterBeginnBeiZugang,
+    fristVorbei,
+    fruehesterBeginnAbHeute,
     monateGesamt: fehler.length ? { monate: 0, tage: 0 } : dauer(e.beginn, e.ende),
     kuerzung,
     fehler,

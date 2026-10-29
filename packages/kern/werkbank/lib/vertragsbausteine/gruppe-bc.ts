@@ -9,14 +9,19 @@ import type { Baustein, Lage } from "./typen";
 import { ARBEITNEHMER } from "./typen";
 import { anteil, euro, hat, leer, liste, mindestlohnAm, monatsstunden, num, prozent, regel, stundenlohn, wenn, wert, zahl, zahlText } from "./hilfen";
 import { uhr } from "@/lib/format";
+import { anzahlEn, euroEn, frei, zahlEn } from "@/lib/dokumente/englisch";
 
 const katalog = (id: string) => `Katalog Abschnitt 4, Baustein ${id}`;
 
 /* B */
 const B1_GLEICH = "nur gleichwertige Tätigkeit";
 const B1_NIEDRIGER = "vorübergehend auch niedriger bewertete Tätigkeit";
+/** Absätze mit laufender Nummer "(1)", "(2)" …, damit bedingte Absätze keine Lücke reißen. */
+const nummeriert = (absaetze: string[]) => absaetze.map((t, i) => `(${i + 1}) ${t}`).join("\n");
 const B2_RADIUS = "Radius um den Standort";
 const B2_ORTE = "genannte Standorte";
+/** Entscheidung 24 (Nick 23.10.2026): Versetzung an jeden Standort desselben Arbeitgebers im Inland, wie § 106 GewO es erlaubt. Warnung statt Sperre (P-021). */
+const B2_INLAND = "alle Standorte des Arbeitgebers in Deutschland";
 const B2_GRENZENLOS = /bundesweit|weltweit|europaweit|überall|jeden ort|jeden standort/i;
 const B2_KONZERN = /konzern|andere gesellschaft|verbundene[ns]? unternehmen|tochtergesellschaft|schwestergesellschaft/i;
 const B3_AUSLAND = "außerhalb der EU und des EWR";
@@ -43,9 +48,66 @@ const c2Lohn = (l: Lage) => stundenlohn(l.person.gehalt, l.person.wochenstunden,
 /** Mindestlohnbezug des Arbeitszeitkontos: Minijob oder das feste Gehalt deckt die Plusstunden nicht zum Mindestlohn (§ 2 Abs. 2 Satz 3 MiLoG). */
 const c3Mindestlohn = (l: Lage) => l.person.beschaeftigung === "minijob" || stundenlohn(l.person.gehalt, l.person.wochenstunden, num(l, "C3", "plusMax") ?? 0) < mindestlohnAm(l.person.eintritt);
 
+/* Englische Fassung (Zweisprachigkeit, Nick 23.10.2026): Auswahlwerte über diese Tabellen, nie den deutschen Wert einsetzen. */
+const monateEn = (n: number) => anzahlEn(n, "month", "months");
+const wochenEn = (n: number) => anzahlEn(n, "week", "weeks");
+const prozentEn = (a: number) => `${zahlEn(a * 100)} per cent`;
+/** 6 ergibt "06:00", 19.5 ergibt "19:30". */
+const uhrEn = (stunden: number) => {
+  const min = Math.round(stunden * 60);
+  return `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+};
+/** Englische Formulierung zum Auswahlwert; unbekannter Wert als freie Eingabe, leer als Platzhalter. */
+const wahlEn = (tabelle: Record<string, string>, wert: string | undefined, platzhalter: string) => tabelle[wert ?? ""] ?? (frei(wert) || platzhalter);
+const B2_KOSTEN_EN: Record<string, string> = {
+  "Arbeitgeber trägt Umzugskosten und zusätzliche Fahrtkosten": "the Employer bears the removal costs and any additional travel costs",
+  "Arbeitgeber trägt zusätzliche Fahrtkosten": "the Employer bears any additional travel costs",
+  "keine Kostenübernahme": "costs are not reimbursed",
+};
+const B3_AUSSTATTUNG_EN: Record<string, string> = {
+  Firmenlaptop: "company laptop", "Bildschirm und Zubehör": "monitor and accessories", Firmenhandy: "company mobile phone", "Zuschuss zur Einrichtung": "allowance towards setting up the workspace",
+};
+const B5_GEBIET_EN: Record<string, string> = { Inland: "within Germany", EU: "within the EU", weltweit: "worldwide" };
+const B5_VERKEHR_EN: Record<string, string> = { Pkw: "car", Bahn: "rail", Flug: "air" };
+const B6_ERSTATTUNG_EN: Record<string, string> = {
+  "nach der Reisekostenrichtlinie": "in accordance with the travel expenses policy",
+  "nach den steuerlichen Pauschalen": "in accordance with the flat rates permitted under tax law",
+};
+const B7_SV_EN: Record<string, string> = {
+  "A1-Bescheinigung beantragt": "A1 certificate applied for",
+  "Sozialversicherungsabkommen geprüft": "social security agreement reviewed",
+  "Prüfung durch Kanzlei oder Lohnbüro": "review by a law firm or payroll office",
+};
+const C4_ERFASSUNG_EN: Record<string, string> = {
+  "elektronisches Zeiterfassungssystem": "electronic time recording system",
+  "Selbsterfassung durch die Person, wöchentliche Abgabe": "self-recording by the employee, submitted weekly",
+};
+const C6_MODELL_EN: Record<string, string> = {
+  "Frühschicht und Spätschicht": "early shift and late shift",
+  "Drei-Schicht mit Nachtschicht": "three-shift system including night shift",
+  "feste Nachtschicht": "permanent night shift",
+  "Wechselschicht mit Nachtschicht": "rotating shifts including night shift",
+};
+const C10_VORAUSSETZUNG_EN: Record<string, string> = {
+  "erheblicher Arbeitsausfall mit Anzeige bei der Agentur für Arbeit": "a significant loss of work, notified to the Federal Employment Agency",
+  "Betriebsvereinbarung über Kurzarbeit und Anzeige bei der Agentur für Arbeit": "a works agreement on short-time work and notification to the Federal Employment Agency",
+};
+const C10_UMFANG_EN: Record<string, string> = { "teilweise Verkürzung": "partial reduction", "Verkürzung bis auf null": "reduction to zero" };
+const C12_ART_EN: Record<string, string> = {
+  "Wertguthaben (Zeitwertkonto)": "long-term value credit account (Wertguthaben)",
+  Jahresarbeitszeitkonto: "annual working time account",
+  Sabbatical: "sabbatical account",
+};
+const C12_BEWERTUNG_EN: Record<string, string> = { "in Zeit": "in hours", "in Geld": "in money" };
+const C12_INSOLVENZ_EN: Record<string, string> = {
+  "doppelseitige Treuhand": "two-way trust arrangement (doppelseitige Treuhand)",
+  Versicherungsmodell: "insurance model",
+  Bankbürgschaft: "bank guarantee",
+};
+
 export const BAUSTEINE_BC: Baustein[] = [
   {
-    id: "B1", gruppe: "B", label: "Erweiterte Tätigkeit und Umsetzung", risiko: "gelb", version: 1, fuer: ARBEITNEHMER,
+    id: "B1", gruppe: "B", label: "Erweiterte Tätigkeit und Umsetzung", labelEn: "Extended duties and reassignment", risiko: "gelb", version: 1, fuer: ARBEITNEHMER,
     passt: "Teams mit wechselnden Aufgaben und kleine Firmen, in denen Beschäftigte flexibel eingesetzt werden.",
     felder: [
       { id: "rahmen", label: "Rahmen der Tätigkeit (Berufsbild oder Entgeltgruppe)", typ: "text", pflicht: true },
@@ -57,6 +119,11 @@ export const BAUSTEINE_BC: Baustein[] = [
       `(1) Der Arbeitgeber kann ${k.vorname} im Rahmen des Berufsbilds ${w.rahmen || "[Berufsbild]"} auch andere gleichwertige Aufgaben zuweisen. Er berücksichtigt dabei die Fähigkeiten und die Interessen von ${k.vorname} nach billigem Ermessen. Das Entgelt bleibt gleich.`,
       ...(w.umfang === B1_NIEDRIGER ? [`(2) Aus dringenden betrieblichen Gründen kann der Arbeitgeber vorübergehend, höchstens für ${monateText(zahl(w.dauerMonate) ?? WERTE.vertragStandards.voruebergehendMonate)}, auch eine niedriger bewertete Tätigkeit zuweisen. Das Entgelt und der Status bleiben in dieser Zeit unverändert.`] : []),
       `(${w.umfang === B1_NIEDRIGER ? 3 : 2}) Eine dauerhafte Änderung der Tätigkeit mit geringerem Entgelt ist nur durch Vereinbarung oder Änderungskündigung möglich. Rechte eines Betriebsrats bleiben unberührt.`,
+    ].join("\n"),
+    textEn: (w, k) => [
+      `(1) The Employer may assign ${k.vorname} other equivalent duties within the job profile ${frei(w.rahmen) || "[job profile]"}. In doing so, it takes into account the skills and interests of ${k.vorname} at its reasonable discretion. The pay remains the same.`,
+      ...(w.umfang === B1_NIEDRIGER ? [`(2) For urgent operational reasons, the Employer may also assign a lower-graded activity on a temporary basis, for no longer than ${monateEn(zahl(w.dauerMonate) ?? WERTE.vertragStandards.voruebergehendMonate)}. Pay and status remain unchanged during this period.`] : []),
+      `(${w.umfang === B1_NIEDRIGER ? 3 : 2}) A permanent change of duties with lower pay is only possible by agreement or by notice of termination with an offer of amended terms (Änderungskündigung). The rights of a works council remain unaffected.`,
     ].join("\n"),
     normen: ["§ 106 GewO", "§ 307 BGB", "§ 308 Nr. 4 BGB", "§ 99 BetrVG"],
     quellen: ["https://www.gesetze-im-internet.de/gewo/__106.html", "https://www.gesetze-im-internet.de/bgb/__307.html", "https://www.gesetze-im-internet.de/betrvg/__99.html", katalog("B1")],
@@ -71,11 +138,11 @@ export const BAUSTEINE_BC: Baustein[] = [
     ],
   },
   {
-    id: "B2", gruppe: "B", label: "Versetzung an einen anderen Ort oder Standort", risiko: "gelb", version: 1, fuer: ARBEITNEHMER,
+    id: "B2", gruppe: "B", label: "Versetzung an einen anderen Ort oder Standort", labelEn: "Transfer to another place or site", risiko: "gelb", version: 2, fuer: ARBEITNEHMER,
     passt: "Firmen mit mehreren Standorten und Außendienst.",
     felder: [
       { id: "standort", label: "Arbeitsort (Standort)", typ: "text", pflicht: true },
-      { id: "grenze", label: "Räumliche Grenze der Versetzung", typ: "auswahl", pflicht: true, optionen: [B2_RADIUS, B2_ORTE] },
+      { id: "grenze", label: "Räumliche Grenze der Versetzung", typ: "auswahl", pflicht: true, optionen: [B2_RADIUS, B2_ORTE, B2_INLAND], hinweis: "Ohne Radius oder Standortliste hängt jede Versetzung am billigen Ermessen im Einzelfall. Radius oder Liste sind sicherer." },
       { id: "radiusKm", label: "Radius in Kilometern", typ: "zahl", pflicht: true, min: 1, bei: { grenze: [B2_RADIUS] } },
       { id: "orte", label: "Standorte, an die versetzt werden kann", typ: "lang", pflicht: true, bei: { grenze: [B2_ORTE] } },
       { id: "ankuendigungWochen", label: "Ankündigung in Wochen", typ: "zahl", pflicht: true, min: 1, standard: String(WERTE.vertragStandards.versetzungAnkuendigungWochen) },
@@ -84,7 +151,7 @@ export const BAUSTEINE_BC: Baustein[] = [
       { id: "andereGesellschaft", label: "Versetzung auch in eine andere Gesellschaft (Konzern)", typ: "janein", standard: "nein", hinweis: "Ein Wechsel des Arbeitgebers geht nur mit Zustimmung der Person per Änderungsvertrag." },
     ],
     text: (w, k) => {
-      const gebiet = w.grenze === B2_ORTE ? `an einen der folgenden Standorte: ${(w.orte ?? "").split("\n").map((s) => s.trim()).filter(Boolean).join("; ") || "[Standorte]"}` : `an einen anderen Standort im Umkreis von ${w.radiusKm || "[Radius]"} km um ${w.standort || "[Standort]"}`;
+      const gebiet = w.grenze === B2_ORTE ? `an einen der folgenden Standorte: ${(w.orte ?? "").split("\n").map((s) => s.trim()).filter(Boolean).join("; ") || "[Standorte]"}` : w.grenze === B2_INLAND ? "an einen anderen Standort des Arbeitgebers in Deutschland" : `an einen anderen Standort im Umkreis von ${w.radiusKm || "[Radius]"} km um ${w.standort || "[Standort]"}`;
       return [
         `(1) Arbeitsort ist ${w.standort || "[Standort]"}.`,
         `(2) Der Arbeitgeber kann ${k.vorname} ${gebiet} versetzen, wenn es betrieblich nötig ist und die Interessen von ${k.vorname}, auch familiäre und soziale Belange, angemessen berücksichtigt sind. Die Tätigkeit bleibt gleichwertig.`,
@@ -93,17 +160,28 @@ export const BAUSTEINE_BC: Baustein[] = [
         `(5) Ein Wechsel zu einer anderen Gesellschaft, auch innerhalb eines Konzerns, ist nur mit Zustimmung von ${k.vorname} in einem Änderungsvertrag möglich.`,
       ].join("\n");
     },
+    textEn: (w, k) => {
+      const gebiet = w.grenze === B2_ORTE ? `to one of the following sites: ${(w.orte ?? "").split("\n").map((s) => s.trim()).filter(Boolean).join("; ") || "[sites]"}` : w.grenze === B2_INLAND ? "to another site of the Employer in Germany" : `to another site within a radius of ${w.radiusKm || "[radius]"} km of ${w.standort || "[site]"}`;
+      return [
+        `(1) The place of work is ${w.standort || "[site]"}.`,
+        `(2) The Employer may transfer ${k.vorname} ${gebiet} if this is operationally necessary and the interests of ${k.vorname}, including family and social concerns, are reasonably taken into account. The activity remains equivalent.`,
+        `(3) The Employer gives at least ${wochenEn(zahl(w.ankuendigungWochen) ?? WERTE.vertragStandards.versetzungAnkuendigungWochen)} notice of the transfer in text form.`,
+        `(4) Costs: ${wahlEn(B2_KOSTEN_EN, w.kosten, "[cost rule]")}.`,
+        `(5) A move to another company, including within a group of companies, is only possible with the consent of ${k.vorname} in an amendment agreement.`,
+      ].join("\n");
+    },
     normen: ["§ 106 GewO", "§ 307 BGB", "§ 2 Abs. 1 Satz 2 Nr. 4 NachwG"],
     quellen: ["https://www.gesetze-im-internet.de/gewo/__106.html", "https://www.gesetze-im-internet.de/nachwg/__2.html", katalog("B2")],
     urteile: [{ az: "BAG 9 AZR 36/09 (13.04.2010)", kennung: "P" }],
     schutz: ["Arbeitsort festgelegt, Versetzung auf Standorte oder Radius begrenzt.", "Wechsel in andere Gesellschaft nur mit Zustimmung (R13).", "Ankündigungsfrist ist Pflicht."],
-    sperren: ["Bundesweit oder weltweit ohne Grenze ohne ausdrückliche Mobilitätsvereinbarung.", "Versetzung ins Ausland ohne Kostenregel.", "Versetzung in eine andere Gesellschaft."],
+    sperren: ["Versetzung ins Ausland über diesen Baustein (dafür B7).", "Versetzung ins Ausland ohne Kostenregel.", "Versetzung in eine andere Gesellschaft."],
     stichwoerter: ["Versetzung", "Standort", "Arbeitsort", "Umzug", "Filiale", "Niederlassung", "Außendienst", "Ortswechsel"],
     regeln: [
-      regel("P-021", "sperre", "B2 ohne räumliche Grenze (Radius oder Orte)", "§ 307 BGB", ["B2"], (l) => {
+      // Entscheidung 24 (Nick 23.10.2026): Warnung statt Sperre. Eine Versetzungsklausel im Rahmen von § 106 GewO hält die BAG-Linie für wirksam (Aktenzeichen prüfen).
+      regel("P-021", "warnung", "B2 ohne räumliche Grenze (Radius oder Orte)", "§ 106 GewO, § 307 BGB", ["B2"], (l) => {
         const g = wert(l, "B2", "grenze");
-        const ohne = leer(g) || (g === B2_RADIUS && !num(l, "B2", "radiusKm")) || (g === B2_ORTE && leer(wert(l, "B2", "orte"))) || B2_GRENZENLOS.test(`${wert(l, "B2", "orte")} ${wert(l, "B2", "standort")}`);
-        return wenn(hat(l, "B2") && ohne, "Die Versetzung braucht eine räumliche Grenze: einen Radius in Kilometern oder eine Liste von Standorten. Bundesweit oder weltweit ohne Grenze ist unangemessen.");
+        const ohne = leer(g) || g === B2_INLAND || (g === B2_RADIUS && !num(l, "B2", "radiusKm")) || (g === B2_ORTE && leer(wert(l, "B2", "orte"))) || B2_GRENZENLOS.test(`${wert(l, "B2", "orte")} ${wert(l, "B2", "standort")}`);
+        return wenn(hat(l, "B2") && ohne, "Die Versetzung hat keine räumliche Grenze. Das trägt nur, solange jede einzelne Versetzung billigem Ermessen entspricht (§ 106 GewO). Ein Radius in Kilometern oder eine Liste von Standorten ist sicherer. Ins Ausland geht es so nicht (dafür B7).");
       }),
       regel("P-022", "sperre", "B2 mit Versetzung in eine andere Gesellschaft", "§ 613 BGB, § 106 GewO (R13)", ["B2"],
         (l) => wenn(hat(l, "B2") && (wert(l, "B2", "andereGesellschaft") === "ja" || B2_KONZERN.test(wert(l, "B2", "orte"))),
@@ -111,7 +189,7 @@ export const BAUSTEINE_BC: Baustein[] = [
     ],
   },
   {
-    id: "B3", gruppe: "B", label: "Mobiles Arbeiten und Homeoffice", risiko: "grün", version: 1, fuer: ARBEITNEHMER,
+    id: "B3", gruppe: "B", label: "Mobiles Arbeiten und Homeoffice", labelEn: "Mobile work and working from home", risiko: "grün", version: 1, fuer: ARBEITNEHMER,
     passt: "Büro-, Wissens- und Verwaltungsarbeit.",
     felder: [
       { id: "umfang", label: "Umfang", typ: "auswahl", pflicht: true, standard: "bis zu einer Zahl von Tagen pro Woche", optionen: ["bis zu einer Zahl von Tagen pro Woche", "feste Tage", "nach Absprache"] },
@@ -141,6 +219,20 @@ export const BAUSTEINE_BC: Baustein[] = [
         ...(w.ort === B3_AUSLAND ? [`(7) Die Arbeit von außerhalb der EU und des EWR ist nur nach folgender Prüfung erlaubt: ${w.auslandPruefung || "[Prüfung]"}.`] : w.ort === "EU und EWR" ? [`(7) Arbeit aus einem anderen Staat zeigt ${k.vorname} vorher in Textform an, damit Steuer und Sozialversicherung geprüft werden können.`] : []),
       ].join("\n");
     },
+    textEn: (w, k) => {
+      const umfang = w.umfang === "feste Tage" ? `on the following days: ${frei(w.festeTage) || "[days]"}` : w.umfang === "nach Absprache" ? "as agreed with the line manager" : `on up to ${w.tage || "[number]"} days per week`;
+      const ort = w.ort === "Wohnung in Deutschland" ? "their own home in Germany" : w.ort === B3_AUSLAND ? "a place outside the EU and the EEA" : w.ort === "EU und EWR" ? "a place in the EU or the EEA" : "a place in Germany";
+      const ausst = liste(w.ausstattung).map((a) => wahlEn(B3_AUSSTATTUNG_EN, a, ""));
+      return [
+        `(1) ${k.vorname} may work remotely ${umfang} from ${ort}.${w.anspruch === "Anspruch im vereinbarten Umfang" ? " There is an entitlement to this to the agreed extent." : " There is no legal entitlement to this."}`,
+        `(2) The Employer may change the extent and the place for objective operational reasons or revoke the permission. It states the reason and gives at least ${wochenEn(zahl(w.widerrufWochen) ?? WERTE.vertragStandards.versetzungAnkuendigungWochen)} notice of the change in text form.`,
+        `(3) Equipment: ${ausst.length ? ausst.join(", ") : "as agreed"}. Costs: ${w.kosten === "monatliche Pauschale" ? `the Employer pays a flat rate of ${euroEn(zahl(w.pauschale) ?? 0)} per month in addition to the salary` : "no reimbursement is made"}.${w.erreichbarkeit ? ` Availability: ${frei(w.erreichbarkeit)}.` : ""}`,
+        `(4) Working time is recorded in full, including when working remotely. Maximum working hours, breaks and rest periods under the Working Hours Act (Arbeitszeitgesetz) remain unchanged.`,
+        `(5) ${k.vorname} protects data and documents from access by third parties, uses only devices and connections approved by the Employer and locks the screen when leaving the workstation.`,
+        `(6) The Employer includes mobile work in the risk assessment and instructs ${k.vorname} accordingly.`,
+        ...(w.ort === B3_AUSLAND ? [`(7) Work from outside the EU and the EEA is only permitted after the following review: ${frei(w.auslandPruefung) || "[review]"}.`] : w.ort === "EU und EWR" ? [`(7) ${k.vorname} notifies the Employer in text form in advance of any work from another state, so that tax and social security can be reviewed.`] : []),
+      ].join("\n");
+    },
     normen: ["§ 106 GewO", "ArbSchG", "§ 8 Abs. 1a SGB VII", "§ 87 Abs. 1 Nr. 14 BetrVG", "Art. 32 DSGVO"],
     quellen: ["https://www.gesetze-im-internet.de/gewo/__106.html", "https://www.gesetze-im-internet.de/sgb_7/__8.html", "https://www.gesetze-im-internet.de/betrvg/__87.html", katalog("B3")],
     urteile: [{ az: "Linie der Instanzgerichte: kein genereller Anspruch auf Homeoffice, Widerruf braucht sachlichen Grund, Aktenzeichen prüfen", kennung: "P" }],
@@ -158,7 +250,7 @@ export const BAUSTEINE_BC: Baustein[] = [
     ],
   },
   {
-    id: "B4", gruppe: "B", label: "Telearbeitsplatz (fester Arbeitsplatz zu Hause)", risiko: "gelb", version: 1, fuer: ARBEITNEHMER,
+    id: "B4", gruppe: "B", label: "Telearbeitsplatz (fester Arbeitsplatz zu Hause)", labelEn: "Telework station (fixed workplace at home)", risiko: "gelb", version: 1, fuer: ARBEITNEHMER,
     passt: "Dauerhafter, vom Arbeitgeber eingerichteter Bildschirmarbeitsplatz in der Wohnung.",
     felder: [
       { id: "adresse", label: "Adresse des Telearbeitsplatzes", typ: "text", pflicht: true },
@@ -173,6 +265,13 @@ export const BAUSTEINE_BC: Baustein[] = [
       w.pauschale ? `(4) Für die Kosten des Arbeitsplatzes zahlt der Arbeitgeber zusätzlich eine Pauschale von ${euro(zahl(w.pauschale) ?? 0)} im Monat.` : "(4) Für Kosten des Arbeitsplatzes gilt § 670 BGB.",
       `(5) Die Arbeitszeit wird erfasst. Daten und Unterlagen schützt ${k.vorname} vor dem Zugriff Dritter.${w.rueckkehr === "ja" ? ` ${k.vorname} kann mit einer Ankündigung in Textform an einen Arbeitsplatz im Betrieb zurückkehren.` : ""}`,
     ].join("\n"),
+    textEn: (w, k) => [
+      `(1) ${k.vorname} works at a telework station set up by the Employer in their home at the following address: ${w.adresse || "[address]"}.`,
+      `(2) The Employer provides and maintains the following equipment: ${frei(w.ausstattung) || "[equipment]"}. It carries out a risk assessment beforehand and instructs ${k.vorname}.`,
+      `(3) The Employer or persons engaged by it enter the home only after prior notice and with the consent of ${k.vorname}. Consent may be refused or withdrawn at any time.`,
+      w.pauschale ? `(4) To cover the costs of the workstation, the Employer additionally pays a flat rate of ${euroEn(zahl(w.pauschale) ?? 0)} per month.` : "(4) § 670 BGB applies to the costs of the workstation.",
+      `(5) Working time is recorded. ${k.vorname} protects data and documents from access by third parties.${w.rueckkehr === "ja" ? ` ${k.vorname} may return to a workstation on the Employer's premises by giving notice in text form.` : ""}`,
+    ].join("\n"),
     normen: ["§ 2 Abs. 7 ArbStättV", "Art. 13 GG", "§ 670 BGB", "ArbSchG"],
     quellen: ["https://www.gesetze-im-internet.de/bgb/__670.html", "https://www.gesetze-im-internet.de/arbst_ttv_2004/__2.html", katalog("B4")],
     schutz: ["Zutritt nur nach Ankündigung und mit widerruflicher Zustimmung.", "Gefährdungsbeurteilung ist Pflicht."],
@@ -180,7 +279,7 @@ export const BAUSTEINE_BC: Baustein[] = [
     stichwoerter: ["Telearbeit", "Telearbeitsplatz", "Heimarbeitsplatz", "fester Homeoffice-Platz", "Arbeitsstättenverordnung"],
   },
   {
-    id: "B5", gruppe: "B", label: "Reisetätigkeit", risiko: "grün", version: 1, fuer: ARBEITNEHMER,
+    id: "B5", gruppe: "B", label: "Reisetätigkeit", labelEn: "Travel", risiko: "grün", version: 1, fuer: ARBEITNEHMER,
     passt: "Außendienst, Beratung, Vertrieb und Projektarbeit.",
     felder: [
       { id: "anteil", label: "Anteil der Arbeitszeit auf Reisen (Prozent)", typ: "prozent", pflicht: true, min: 0, max: 100 },
@@ -194,6 +293,11 @@ export const BAUSTEINE_BC: Baustein[] = [
       `(2) Reisen werden vorher abgestimmt.${w.ruecksicht === "ja" ? ` Der Arbeitgeber nimmt dabei Rücksicht auf Pflege- und Betreuungspflichten von ${k.vorname}.` : ""}`,
       `(3) Ruhezeiten und Höchstarbeitszeit nach dem Arbeitszeitgesetz gelten auch auf Reisen. Reisezeit außerhalb der regelmäßigen Arbeitszeit wird vergütet oder ausgeglichen${"B6" in k.auswahl ? " wie in der Regelung zu Dienstreisen vereinbart" : ""}.`,
     ].join("\n"),
+    textEn: (w, k) => [
+      `(1) The duties include business travel (${wahlEn(B5_GEBIET_EN, w.gebiet, "[area]")}) amounting to about ${prozentEn(anteil(w.anteil) ?? 0)} of working time${zahl(w.naechte) ? ` with about ${zahlEn(zahl(w.naechte)!)} overnight stays per month` : ""}.${liste(w.verkehrsmittel).length ? ` Means of transport: ${liste(w.verkehrsmittel).map((v) => wahlEn(B5_VERKEHR_EN, v, "")).join(", ")}.` : ""}`,
+      `(2) Travel is agreed in advance.${w.ruecksicht === "ja" ? ` In doing so, the Employer takes into account the care and childcare responsibilities of ${k.vorname}.` : ""}`,
+      `(3) Rest periods and maximum working hours under the Working Hours Act also apply when travelling. Travel time outside regular working hours is paid or compensated${"B6" in k.auswahl ? " as agreed in the provision on business travel" : ""}.`,
+    ].join("\n"),
     normen: ["§ 106 GewO", "ArbZG", "§ 87 Abs. 1 Nr. 2 BetrVG"],
     quellen: ["https://www.gesetze-im-internet.de/gewo/__106.html", "https://www.gesetze-im-internet.de/arbzg/__5.html", katalog("B5")],
     schutz: ["Umfang wird genannt.", "Reisen außerhalb der Normalarbeitszeit nach B6 vergütet oder ausgeglichen."],
@@ -201,7 +305,7 @@ export const BAUSTEINE_BC: Baustein[] = [
     stichwoerter: ["Reisen", "Reisetätigkeit", "Außendienst", "Kundentermine", "unterwegs", "Übernachtung"],
   },
   {
-    id: "B6", gruppe: "B", label: "Dienstreisen: Reisezeit, Kosten, Vorschuss", risiko: "grün", version: 1, fuer: ARBEITNEHMER,
+    id: "B6", gruppe: "B", label: "Dienstreisen: Reisezeit, Kosten, Vorschuss", labelEn: "Business travel: travel time, expenses, advance", risiko: "grün", version: 1, fuer: ARBEITNEHMER,
     passt: "Alle, die reisen.",
     felder: [
       { id: "reisezeit", label: "Reisezeit als Arbeitszeit", typ: "auswahl", pflicht: true, standard: "voll als Arbeitszeit", optionen: ["voll als Arbeitszeit", "teilweise als Arbeitszeit", "außerhalb der regelmäßigen Arbeitszeit nicht als Arbeitszeit"],
@@ -220,6 +324,14 @@ export const BAUSTEINE_BC: Baustein[] = [
         `(3) ${k.vorname} reicht die Belege innerhalb von ${monateText(zahl(w.belegMonate) ?? WERTE.vertragStandards.reiseBelegMinMonate)} nach Ende der Reise in Textform ein.`,
       ].join("\n");
     },
+    textEn: (w, k) => {
+      const rz = w.reisezeit === "teilweise als Arbeitszeit" ? `as working time at a rate of ${prozentEn(anteil(w.anteil) ?? 0)}` : w.reisezeit === "voll als Arbeitszeit" ? "in full as working time" : "as working time only within regular working hours";
+      return [
+        `(1) Travel time for business trips ordered by the Employer counts ${rz}. In any event, ${k.vorname} receives at least the statutory minimum wage for all working and travel hours combined.`,
+        `(2) The Employer reimburses necessary travel expenses ${wahlEn(B6_ERSTATTUNG_EN, w.erstattung, "[rule]")}.${w.vorschuss === "ja" ? " On request, it pays a reasonable advance." : ""}`,
+        `(3) ${k.vorname} submits the receipts in text form within ${monateEn(zahl(w.belegMonate) ?? WERTE.vertragStandards.reiseBelegMinMonate)} after the end of the trip.`,
+      ].join("\n");
+    },
     normen: ["§ 670 BGB", "§ 1 MiLoG", "EStG Reisekosten"],
     quellen: ["https://www.gesetze-im-internet.de/bgb/__670.html", "https://www.gesetze-im-internet.de/milog/__1.html", katalog("B6")],
     urteile: [{ az: "BAG 5 AZR 553/17 (17.10.2018)", kennung: "P" }],
@@ -228,7 +340,7 @@ export const BAUSTEINE_BC: Baustein[] = [
     stichwoerter: ["Dienstreise", "Reisekosten", "Reisezeit", "Spesen", "Vorschuss", "Belege", "Hotel"],
   },
   {
-    id: "B7", gruppe: "B", label: "Auslandseinsatz und Entsendung", risiko: "gelb", version: 1, fuer: ARBEITNEHMER,
+    id: "B7", gruppe: "B", label: "Auslandseinsatz und Entsendung", labelEn: "Assignment abroad and posting", risiko: "gelb", version: 1, fuer: ARBEITNEHMER,
     passt: "Einsätze im Ausland über einen Monat, Fachkräfte.",
     felder: [
       { id: "land", label: "Land", typ: "text", pflicht: true },
@@ -247,6 +359,13 @@ export const BAUSTEINE_BC: Baustein[] = [
       `(4) Rückkehr: ${w.rueckkehr || "[Bedingungen]"}.`,
       `(5) Die zwingenden Schutzvorschriften des Ziellandes bleiben unberührt. Eine Rückzahlung von Kosten gilt nur, soweit sie gesondert nach den Regeln zur Rückzahlung vereinbart ist.`,
     ].join("\n"),
+    textEn: (w, k) => [
+      `(1) ${k.vorname} is posted to ${frei(w.land) || "[country]"} for ${monateEn(zahl(w.dauerMonate) ?? 1)}.`,
+      `(2) Remuneration is paid in ${frei(w.waehrung) || "[currency]"}.${zahl(w.zulage) ? ` For the duration of the assignment, the Employer pays a posting allowance of ${euroEn(zahl(w.zulage)!)} per month.` : ""} Further benefits: ${frei(w.sachleistungen) || "[benefits]"}.`,
+      `(3) Social security: ${wahlEn(B7_SV_EN, w.sozialversicherung, "[status]")}. Health insurance abroad: ${frei(w.krankenversicherung) || "[insurance]"}.`,
+      `(4) Return: ${frei(w.rueckkehr) || "[conditions]"}.`,
+      `(5) The mandatory protective provisions of the host country remain unaffected. Any repayment of costs applies only to the extent that it is agreed separately under the rules on repayment.`,
+    ].join("\n"),
     normen: ["Rom-I-VO", "§ 2 Abs. 2 NachwG", "Entsenderecht des Ziellandes", "VO (EG) 883/2004 (A1-Bescheinigung)"],
     quellen: ["https://www.gesetze-im-internet.de/nachwg/__2.html", "https://eur-lex.europa.eu/legal-content/DE/TXT/?uri=CELEX:32008R0593", katalog("B7")],
     schutz: ["Pflichtangaben nach § 2 Abs. 2 NachwG werden verlangt.", "Rückzahlungen nur nach L4."],
@@ -254,7 +373,7 @@ export const BAUSTEINE_BC: Baustein[] = [
     stichwoerter: ["Entsendung", "Auslandseinsatz", "Expat", "A1-Bescheinigung", "Ausland", "Abordnung"],
   },
   {
-    id: "C1", gruppe: "C", label: "Überstunden: Anordnung und Ausgleich", risiko: "grün", version: 1, fuer: ARBEITNEHMER, ersetzt: "§ 5",
+    id: "C1", gruppe: "C", label: "Überstunden: Anordnung und Ausgleich", labelEn: "Overtime: instruction and compensation", risiko: "grün", version: 1, fuer: ARBEITNEHMER, ersetzt: "§ 5",
     passt: "Alle. Ersetzt die Überstundenregel im Arbeitsvertrag.",
     felder: [
       { id: "voraussetzung", label: "Voraussetzung", typ: "auswahl", pflicht: true, standard: "Anordnung des Arbeitgebers", optionen: ["Anordnung des Arbeitgebers", "Anordnung oder vorherige Zustimmung der Führungskraft"] },
@@ -279,6 +398,21 @@ export const BAUSTEINE_BC: Baustein[] = [
         `(4) Die gesamte Arbeitszeit einschließlich der Überstunden wird erfasst. Der gesetzliche Mindestlohn für jede Arbeitsstunde bleibt unberührt.`,
       ].join("\n");
     },
+    textEn: (w, k) => {
+      const grenze = zahl(w.grenzeMonat) ?? 0;
+      const z = c1Zeitraum(w.ausgleichMonate, k.gehalt, k.wochenstunden, grenze, k.eintritt);
+      const zu = zahl(w.zuschlag) ? ` plus a premium of ${prozentEn(anteil(w.zuschlag)!)}` : "";
+      const verg = `paid at the pro rata hourly rate (monthly salary divided by the contractual monthly hours)${zu}`;
+      const ausgleich = w.ausgleich === C1_VERGUETUNG
+        ? `(3) Overtime is ${verg}, no later than with the payroll for the following month.`
+        : `(3) Overtime is ${w.ausgleich === C1_WAHL ? "compensated by time off or paid, at the Employer's choice" : "compensated by time off"}. Time off in lieu is granted within ${monateEn(z.monate)} after the overtime arises. Any overtime not compensated within this period is ${verg}.`;
+      return [
+        `(1) ${k.vorname} works overtime only on the instruction of the Employer${w.voraussetzung?.startsWith("Anordnung oder") ? " or with the prior consent of the line manager" : ""}. Overtime may only be instructed within the limits of the Working Hours Act and up to ${grenze ? zahlEn(grenze) : "[number]"} hours of overtime per month.`,
+        `(2) Overtime means hours worked in excess of the regular working time agreed in the contract.`,
+        ausgleich,
+        `(4) All working time, including overtime, is recorded. The statutory minimum wage for every hour worked remains unaffected.`,
+      ].join("\n");
+    },
     normen: ["§ 612 BGB", "§ 3 ArbZG", "§ 16 Abs. 2 ArbZG", "§ 87 Abs. 1 Nr. 3 BetrVG", "§ 2 MiLoG"],
     quellen: ["https://www.gesetze-im-internet.de/arbzg/__3.html", "https://www.gesetze-im-internet.de/arbzg/__16.html", "https://www.gesetze-im-internet.de/milog/__2.html", "https://www.gesetze-im-internet.de/bgb/__612.html", katalog("C1")],
     urteile: [{ az: "BAG 1 ABR 22/21 (13.09.2022)", kennung: "P" }, { az: "BAG 5 AZR 122/18 (04.05.2022)", kennung: "P" }, { az: "BAG 5 AZR 359/21", kennung: "P" }],
@@ -300,7 +434,7 @@ export const BAUSTEINE_BC: Baustein[] = [
     ],
   },
   {
-    id: "C2", gruppe: "C", label: "Überstundenpauschale (Abgeltung durch das Gehalt)", risiko: "gelb", version: 1, fuer: ARBEITNEHMER,
+    id: "C2", gruppe: "C", label: "Überstundenpauschale (Abgeltung durch das Gehalt)", labelEn: "Overtime flat rate (covered by the salary)", risiko: "gelb", version: 1, fuer: ARBEITNEHMER,
     passt: "Führungskräfte und gut verdienende Fachkräfte. Nicht für Beschäftigte im Mindestlohnbereich.",
     felder: [
       { id: "stunden", label: "Mit dem Gehalt abgegoltene Überstunden pro Monat", typ: "zahl", pflicht: true, min: 1,
@@ -315,6 +449,16 @@ export const BAUSTEINE_BC: Baustein[] = [
         `(3) Die Arbeitszeit wird vollständig erfasst, auch die abgegoltenen Überstunden.`,
         `(4) Für jede geleistete Stunde einschließlich der abgegoltenen Überstunden erhält ${k.vorname} mindestens den gesetzlichen Mindestlohn. Reicht das Gehalt dafür nicht, zahlt der Arbeitgeber die Differenz.`,
         `(5) Zuschläge für Nacht-, Sonn- und Feiertagsarbeit nach Gesetz, Tarifvertrag oder Betriebsvereinbarung bleiben unberührt.`,
+      ].join("\n");
+    },
+    textEn: (w, k) => {
+      const n = zahl(w.stunden);
+      return [
+        `(1) Up to ${n ? zahlEn(n) : "[number]"} hours of overtime per month are covered by the monthly salary. ${k.vorname} works overtime only on the instruction of the Employer and within the limits of the Working Hours Act.`,
+        `(2) Overtime beyond this number ${w.darueber === "werden in Freizeit ausgeglichen" ? "is compensated by time off" : "is paid at the pro rata hourly rate"}.`,
+        `(3) Working time is recorded in full, including the overtime covered by the salary.`,
+        `(4) For every hour worked, including the overtime covered by the salary, ${k.vorname} receives at least the statutory minimum wage. If the salary is not sufficient for this, the Employer pays the difference.`,
+        `(5) Premiums for night, Sunday and public holiday work under statute, collective agreement or works agreement remain unaffected.`,
       ].join("\n");
     },
     normen: ["§ 307 Abs. 1 Satz 2 BGB", "§ 612 BGB", "§ 1 MiLoG", "§ 16 Abs. 2 ArbZG"],
@@ -348,14 +492,15 @@ export const BAUSTEINE_BC: Baustein[] = [
         if (!hat(l, "C2")) return null;
         const sl = c2Lohn(l);
         const stufe = MINDESTLOHN.filter((m) => compare(m.gueltigAb, l.person.eintritt) > 0).find((m) => sl < m.wert);
-        return wenn(!!stufe, `Ab ${formatDE(stufe!.gueltigAb)} gilt ein Mindestlohn von ${euro(stufe!.wert)}. Mit der Pauschale liegt der rechnerische Stundenlohn dann bei ${euro(sl)}. Die Pauschale wird damit unwirksam. Senke die Pauschalstunden oder vereinbare die Gehaltsanpassung gleich mit.`);
+        if (!stufe) return null;
+        return `Ab ${formatDE(stufe.gueltigAb)} gilt ein Mindestlohn von ${euro(stufe.wert)}. Mit der Pauschale liegt der rechnerische Stundenlohn dann bei ${euro(sl)}. Die Pauschale wird damit unwirksam. Senke die Pauschalstunden oder vereinbare die Gehaltsanpassung gleich mit.`;
       }),
       regel("K-07", "warnung", "C2 und C3 für dieselben Stunden (Doppelabgeltung)", "§ 307 Abs. 1 Satz 2 BGB", ["C2", "C3"],
         (l) => wenn(hat(l, "C2") && hat(l, "C3"), "Überstundenpauschale (C2) und Arbeitszeitkonto (C3) gleichen womöglich dieselben Stunden aus. Wähle eins oder lege fest, dass erst die Stunden über der Pauschale ins Konto gehen.")),
     ],
   },
   {
-    id: "C3", gruppe: "C", label: "Arbeitszeitkonto", risiko: "gelb", version: 1, fuer: ARBEITNEHMER,
+    id: "C3", gruppe: "C", label: "Arbeitszeitkonto", labelEn: "Working time account", risiko: "gelb", version: 1, fuer: ARBEITNEHMER,
     passt: "Schwankender Bedarf, Gleitzeit, Teilzeit mit Ausgleich.",
     felder: [
       { id: "ausgleichMonate", label: "Ausgleichszeitraum in Monaten", typ: "zahl", pflicht: true, min: 1,
@@ -372,6 +517,16 @@ export const BAUSTEINE_BC: Baustein[] = [
         `(3) Urlaub, Krankheit und Feiertage werden mit der vertraglichen Arbeitszeit gebucht. An Tagen mit Entgeltfortzahlung wird nichts vom Entgelt abgezogen.`,
         `(4) Minusstunden entstehen nicht, wenn der Arbeitgeber ${k.vorname} nicht beschäftigt. ${w.minus === "Verrechnung bei Ende nur, wenn selbst zu vertreten" ? `Bei Ende des Arbeitsverhältnisses werden Minusstunden nur verrechnet, soweit ${k.vorname} sie selbst zu vertreten hat und der Arbeitgeber sie nicht angeordnet hat.` : "Minusstunden werden im Ausgleichszeitraum nachgearbeitet."}`,
         `(5) Bei Ende des Arbeitsverhältnisses zahlt der Arbeitgeber offene Plusstunden mit dem anteiligen Stundenlohn aus. Für Stunden, die nicht durch das feste Gehalt mit dem Mindestlohn abgedeckt sind, gelten die Grenzen des § 2 Abs. 2 MiLoG.`,
+      ].join("\n");
+    },
+    textEn: (w, k) => {
+      const m = zahl(w.ausgleichMonate);
+      return [
+        `(1) A working time account is kept for ${k.vorname}. Differences between actual and contractual working time are recorded in it.`,
+        `(2) The account may show no more than ${w.plusMax ? zahlEn(zahl(w.plusMax) ?? 0) : "[number]"} plus hours and no more than ${w.minusMax ? zahlEn(zahl(w.minusMax) ?? 0) : "[number]"} minus hours. Plus hours are balanced within ${m ? monateEn(m) : "[period]"}; they do not lapse.`,
+        `(3) Holiday, sickness and public holidays are recorded at the contractual working time. No deduction is made from pay on days with continued payment of remuneration.`,
+        `(4) Minus hours do not arise if the Employer does not provide ${k.vorname} with work. ${w.minus === "Verrechnung bei Ende nur, wenn selbst zu vertreten" ? `When the employment ends, minus hours are only set off to the extent that ${k.vorname} is responsible for them and the Employer did not instruct them.` : "Minus hours are made up by working additional hours within the balancing period."}`,
+        `(5) When the employment ends, the Employer pays out any outstanding plus hours at the pro rata hourly rate. For hours not covered at the minimum wage by the fixed salary, the limits of § 2 para. 2 MiLoG apply.`,
       ].join("\n");
     },
     normen: ["§ 87 Abs. 1 Nr. 2 und 3 BetrVG", "§ 2 Abs. 2 MiLoG", "§ 4 EFZG", "§ 11 BUrlG"],
@@ -399,7 +554,7 @@ export const BAUSTEINE_BC: Baustein[] = [
     ],
   },
   {
-    id: "C4", gruppe: "C", label: "Vertrauensarbeitszeit", risiko: "grün", version: 1, fuer: ARBEITNEHMER,
+    id: "C4", gruppe: "C", label: "Vertrauensarbeitszeit", labelEn: "Trust-based working time", risiko: "grün", version: 1, fuer: ARBEITNEHMER,
     passt: "Wissensarbeit und Führungskräfte.",
     felder: [
       { id: "erfassung", label: "Erfassung der Arbeitszeit", typ: "auswahl", standard: "elektronisches Zeiterfassungssystem",
@@ -411,6 +566,11 @@ export const BAUSTEINE_BC: Baustein[] = [
       `(1) ${k.vorname} bestimmt Beginn und Ende der täglichen Arbeitszeit selbst. Der Arbeitgeber verzichtet auf die Kontrolle der Lage der Arbeitszeit, nicht auf ihre Dauer.${w.kernzeit ? ` Anwesenheit: ${w.kernzeit}.` : ""}${w.erreichbarkeit ? ` Erreichbarkeit: ${w.erreichbarkeit}.` : ""}`,
       `(2) Die Arbeitszeit wird erfasst: ${w.erfassung || "[Erfassung]"}. Der Arbeitgeber prüft die Aufzeichnungen stichprobenweise.`,
       `(3) Höchstarbeitszeit, Pausen und Ruhezeiten nach dem Arbeitszeitgesetz gelten unverändert.`,
+    ].join("\n"),
+    textEn: (w, k) => [
+      `(1) ${k.vorname} determines the start and end of daily working time. The Employer waives control over when the work is done, not over how long.${w.kernzeit ? ` Attendance: ${frei(w.kernzeit)}.` : ""}${w.erreichbarkeit ? ` Availability: ${frei(w.erreichbarkeit)}.` : ""}`,
+      `(2) Working time is recorded: ${wahlEn(C4_ERFASSUNG_EN, w.erfassung, "[recording method]")}. The Employer checks the records on a sample basis.`,
+      `(3) Maximum working hours, breaks and rest periods under the Working Hours Act remain unchanged.`,
     ].join("\n"),
     normen: ["§ 3 Abs. 2 Nr. 1 ArbSchG", "ArbZG", "§ 16 Abs. 2 ArbZG"],
     quellen: ["https://www.gesetze-im-internet.de/arbschg/__3.html", "https://www.gesetze-im-internet.de/arbzg/__16.html", katalog("C4")],
@@ -424,7 +584,7 @@ export const BAUSTEINE_BC: Baustein[] = [
     ],
   },
   {
-    id: "C5", gruppe: "C", label: "Gleitzeit und Kernzeit", risiko: "grün", version: 1, fuer: ARBEITNEHMER,
+    id: "C5", gruppe: "C", label: "Gleitzeit und Kernzeit", labelEn: "Flexitime and core time", risiko: "grün", version: 1, fuer: ARBEITNEHMER,
     passt: "Büroarbeit.",
     felder: [
       { id: "rahmenVon", label: "Rahmenzeit ab (Uhr)", typ: "zahl", pflicht: true, min: 0, max: 24, standard: String(WERTE.vertragStandards.gleitzeitVon) },
@@ -439,6 +599,14 @@ export const BAUSTEINE_BC: Baustein[] = [
         `(1) ${k.vorname} kann Beginn und Ende der Arbeitszeit innerhalb der Rahmenzeit von ${uhr(zahl(w.rahmenVon) ?? WERTE.vertragStandards.gleitzeitVon)} bis ${uhr(zahl(w.rahmenBis) ?? WERTE.vertragStandards.gleitzeitBis)} selbst wählen.${kern}`,
         `(2) Zeitsalden: ${w.saldo === "Übertrag auf das Arbeitszeitkonto" ? "Sie werden auf das Arbeitszeitkonto übertragen." : "Sie werden im laufenden Kalendermonat ausgeglichen."}`,
         `(3) Die Arbeitszeit wird erfasst. Höchstarbeitszeit, Pausen und Ruhezeiten nach dem Arbeitszeitgesetz gelten.`,
+      ].join("\n");
+    },
+    textEn: (w, k) => {
+      const kern = zahl(w.kernVon) !== null && zahl(w.kernBis) !== null ? ` During the core time from ${uhrEn(zahl(w.kernVon)!)} to ${uhrEn(zahl(w.kernBis)!)}, ${k.vorname} is present or available.` : "";
+      return [
+        `(1) ${k.vorname} may choose the start and end of working time within the flexitime band from ${uhrEn(zahl(w.rahmenVon) ?? WERTE.vertragStandards.gleitzeitVon)} to ${uhrEn(zahl(w.rahmenBis) ?? WERTE.vertragStandards.gleitzeitBis)}.${kern}`,
+        `(2) Time balances: ${w.saldo === "Übertrag auf das Arbeitszeitkonto" ? "They are transferred to the working time account." : "They are balanced within the current calendar month."}`,
+        `(3) Working time is recorded. Maximum working hours, breaks and rest periods under the Working Hours Act apply.`,
       ].join("\n");
     },
     normen: ["§ 87 Abs. 1 Nr. 2 BetrVG", "§ 2 Abs. 3 ArbZG"],
@@ -456,7 +624,7 @@ export const BAUSTEINE_BC: Baustein[] = [
     ],
   },
   {
-    id: "C6", gruppe: "C", label: "Schichtarbeit", risiko: "grün", version: 1, fuer: ARBEITNEHMER,
+    id: "C6", gruppe: "C", label: "Schichtarbeit", labelEn: "Shift work", risiko: "grün", version: 1, fuer: ARBEITNEHMER,
     passt: "Produktion, Pflege, Gastronomie, Logistik.",
     felder: [
       { id: "modell", label: "Schichtmodell", typ: "auswahl", pflicht: true, optionen: ["Frühschicht und Spätschicht", ...C6_NACHT] },
@@ -474,6 +642,15 @@ export const BAUSTEINE_BC: Baustein[] = [
         `(2) Der Arbeitgeber gibt den Schichtplan mindestens ${zahl(w.ankuendigungTage) ? zahlText(zahl(w.ankuendigungTage)!) : "[Zahl]"} Kalendertage vorher bekannt. Schichtänderungen sind nur unter folgenden Voraussetzungen möglich: ${w.aenderung || "[Voraussetzungen]"}.`,
         ...(nacht ? [`(3) Für Arbeit in der Nachtzeit (${uhr(WERTE.arbzgNachtzeit.vonStunde)} bis ${uhr(WERTE.arbzgNachtzeit.bisStunde)}) erhält ${k.vorname} ${w.nachtausgleich === "bezahlte freie Tage" ? "eine angemessene Zahl bezahlter freier Tage" : `einen Zuschlag von ${prozent(anteil(w.nachtZuschlag) ?? 0)} auf den Grundstundenlohn`}. ${k.vorname} kann sich vor Beginn und danach regelmäßig arbeitsmedizinisch untersuchen lassen; die Kosten trägt der Arbeitgeber.`] : []),
         ...(zahl(w.schichtzulage) ? [`(${nacht ? 4 : 3}) Zusätzlich zahlt der Arbeitgeber eine Schichtzulage von ${euro(zahl(w.schichtzulage)!)} im Monat.`] : []),
+      ].join("\n");
+    },
+    textEn: (w, k) => {
+      const nacht = C6_NACHT.includes(w.modell ?? "");
+      return [
+        `(1) ${k.vorname} works in a shift system: ${wahlEn(C6_MODELL_EN, w.modell, "[model]")}. Rotation: ${frei(w.rhythmus) || "[rotation]"}.`,
+        `(2) The Employer announces the shift schedule at least ${zahl(w.ankuendigungTage) ? zahlEn(zahl(w.ankuendigungTage)!) : "[number]"} calendar days in advance. Changes to shifts are only possible under the following conditions: ${frei(w.aenderung) || "[conditions]"}.`,
+        ...(nacht ? [`(3) For work during night time (${uhrEn(WERTE.arbzgNachtzeit.vonStunde)} to ${uhrEn(WERTE.arbzgNachtzeit.bisStunde)}), ${k.vorname} receives ${w.nachtausgleich === "bezahlte freie Tage" ? "an appropriate number of paid days off" : `a premium of ${prozentEn(anteil(w.nachtZuschlag) ?? 0)} on the basic hourly rate`}. ${k.vorname} may undergo occupational health examinations before starting and regularly thereafter; the Employer bears the costs.`] : []),
+        ...(zahl(w.schichtzulage) ? [`(${nacht ? 4 : 3}) In addition, the Employer pays a shift allowance of ${euroEn(zahl(w.schichtzulage)!)} per month.`] : []),
       ].join("\n");
     },
     normen: ["§ 2 Abs. 1 Satz 2 Nr. 8 NachwG", "§ 6 ArbZG", "§ 87 Abs. 1 Nr. 2 BetrVG"],
@@ -495,7 +672,7 @@ export const BAUSTEINE_BC: Baustein[] = [
     ],
   },
   {
-    id: "C7", gruppe: "C", label: "Rufbereitschaft", risiko: "grün", version: 1, fuer: ARBEITNEHMER,
+    id: "C7", gruppe: "C", label: "Rufbereitschaft", labelEn: "On-call duty", risiko: "grün", version: 1, fuer: ARBEITNEHMER,
     passt: "IT-Betrieb, Technik, Pflege, Notdienste.",
     felder: [
       { id: "haeufigkeit", label: "Rufbereitschaftstage pro Monat (höchstens)", typ: "zahl", pflicht: true, min: 1 },
@@ -510,6 +687,12 @@ export const BAUSTEINE_BC: Baustein[] = [
       `(3) Einsätze einschließlich der Wege sind Arbeitszeit und werden zusätzlich ${w.einsatz === "als Arbeitszeit mit Zuschlag" ? `mit dem anteiligen Stundenlohn und einem Zuschlag von ${prozent(anteil(w.zuschlag) ?? 0)}` : "mit dem anteiligen Stundenlohn"} vergütet, mindestens mit dem gesetzlichen Mindestlohn.`,
       `(4) Nach einem Einsatz beginnt die Ruhezeit von ${WERTE.arbzgRuhezeit.stunden} Stunden neu, soweit das Arbeitszeitgesetz keine Ausnahme zulässt.`,
     ].join("\n"),
+    textEn: (w, k) => [
+      `(1) ${k.vorname} is on call on no more than ${w.haeufigkeit || "[number]"} days per month. ${k.vorname} is free to choose where to stay and starts work within ${w.reaktionMinuten || "[number]"} minutes of being called.`,
+      `(2) For each day on call, the Employer pays a flat rate of ${euroEn(zahl(w.pauschale) ?? 0)}.`,
+      `(3) Call-outs, including travel to and from work, are working time and are paid additionally ${w.einsatz === "als Arbeitszeit mit Zuschlag" ? `at the pro rata hourly rate plus a premium of ${prozentEn(anteil(w.zuschlag) ?? 0)}` : "at the pro rata hourly rate"}, and at least at the statutory minimum wage.`,
+      `(4) After a call-out, the rest period of ${WERTE.arbzgRuhezeit.stunden} hours starts again, unless the Working Hours Act permits an exception.`,
+    ].join("\n"),
     normen: ["§ 5 ArbZG", "§ 1 MiLoG", "§ 87 Abs. 1 Nr. 2 und 3 BetrVG"],
     quellen: ["https://www.gesetze-im-internet.de/arbzg/__5.html", "https://www.gesetze-im-internet.de/milog/__1.html", katalog("C7")],
     urteile: [{ az: "EuGH C-518/15 (Matzak)", kennung: "P" }],
@@ -519,12 +702,13 @@ export const BAUSTEINE_BC: Baustein[] = [
     regeln: [
       regel("P-034", "warnung", "C7 mit sehr kurzer Reaktionszeit: Bereitschaftsdienst prüfen", "EuGH C-518/15 (Matzak)", ["C7"], (l) => {
         const r = num(l, "C7", "reaktionMinuten");
-        return wenn(hat(l, "C7") && r !== null && r < WERTE.rufbereitschaftReaktionMinuten.wert, `Eine Reaktionszeit von ${zahlText(r!)} Minuten schränkt die Freizeit stark ein. Das kann Bereitschaftsdienst sein, der voll als Arbeitszeit zählt (C8). Kanzlei prüfen.`);
+        if (!hat(l, "C7") || r === null || r >= WERTE.rufbereitschaftReaktionMinuten.wert) return null;
+        return `Eine Reaktionszeit von ${zahlText(r)} Minuten schränkt die Freizeit stark ein. Das kann Bereitschaftsdienst sein, der voll als Arbeitszeit zählt (C8). Kanzlei prüfen.`;
       }),
     ],
   },
   {
-    id: "C8", gruppe: "C", label: "Bereitschaftsdienst", risiko: "gelb", version: 1, fuer: ARBEITNEHMER,
+    id: "C8", gruppe: "C", label: "Bereitschaftsdienst", labelEn: "Stand-by duty on site", risiko: "gelb", version: 1, fuer: ARBEITNEHMER,
     passt: "Pflege, Rettung, Technik am Ort.",
     felder: [
       { id: "stundenMonat", label: "Bereitschaftsdienst in Stunden pro Monat (höchstens)", typ: "zahl", pflicht: true, min: 1 },
@@ -534,6 +718,11 @@ export const BAUSTEINE_BC: Baustein[] = [
       `(1) ${k.vorname} leistet Bereitschaftsdienst im Umfang von höchstens ${w.stundenMonat || "[Zahl]"} Stunden im Monat. Bereitschaftsdienst ist Arbeitszeit.`,
       `(2) Jede Stunde Bereitschaftsdienst wird mit ${prozent(anteil(w.bewertung) ?? 0)} des anteiligen Stundenlohns vergütet, tatsächliche Arbeit voll. Für alle Stunden zusammen erhält ${k.vorname} im Monat mindestens den gesetzlichen Mindestlohn.`,
       `(3) Höchstarbeitszeit und Ruhezeiten richten sich nach dem Arbeitszeitgesetz. Abweichungen sind nur durch Tarifvertrag oder Betriebsvereinbarung möglich (§ 7 ArbZG).`,
+    ].join("\n"),
+    textEn: (w, k) => [
+      `(1) ${k.vorname} performs stand-by duty of no more than ${w.stundenMonat || "[number]"} hours per month. Stand-by duty is working time.`,
+      `(2) Each hour of stand-by duty is paid at ${prozentEn(anteil(w.bewertung) ?? 0)} of the pro rata hourly rate, and actual work in full. For all hours combined, ${k.vorname} receives at least the statutory minimum wage each month.`,
+      `(3) Maximum working hours and rest periods are governed by the Working Hours Act. Deviations are only possible by collective agreement or works agreement (§ 7 ArbZG).`,
     ].join("\n"),
     normen: ["§ 2 Abs. 1 ArbZG", "§ 7 ArbZG", "§ 1 MiLoG"],
     quellen: ["https://www.gesetze-im-internet.de/arbzg/__7.html", "https://www.gesetze-im-internet.de/milog/__1.html", katalog("C8")],
@@ -554,7 +743,7 @@ export const BAUSTEINE_BC: Baustein[] = [
     ],
   },
   {
-    id: "C9", gruppe: "C", label: "Arbeit auf Abruf", risiko: "gelb", version: 1, fuer: ARBEITNEHMER,
+    id: "C9", gruppe: "C", label: "Arbeit auf Abruf", labelEn: "Work on demand", risiko: "gelb", version: 1, fuer: ARBEITNEHMER,
     passt: "Aushilfen und Teilzeit mit schwankendem Bedarf.",
     felder: [
       { id: "mindestStunden", label: "Wöchentliche Mindestarbeitszeit (Stunden)", typ: "zahl", pflicht: true, min: 1,
@@ -568,6 +757,11 @@ export const BAUSTEINE_BC: Baustein[] = [
       `(1) ${k.vorname} arbeitet auf Abruf. Die wöchentliche Mindestarbeitszeit beträgt ${w.mindestStunden || "[Zahl]"} Stunden.${zahl(w.mehrProzent) ? ` Der Arbeitgeber kann zusätzlich bis zu ${prozent(anteil(w.mehrProzent)!)} davon abrufen.` : ""}${zahl(w.wenigerProzent) ? ` Ist eine Höchstarbeitszeit vereinbart, ruft er mindestens ${prozent(1 - anteil(w.wenigerProzent)!)} davon ab.` : ""}`,
       `(2) Abrufe sind nur in folgendem Zeitrahmen möglich: ${w.zeitrahmen || "[Zeitrahmen]"}. Der Arbeitgeber teilt die Lage der Arbeitszeit mindestens ${zahlText(zahl(w.ankuendigungTage) ?? WERTE.abruf.ankuendigungTage)} Tage im Voraus mit; sonst muss ${k.vorname} nicht arbeiten.`,
       `(3) Für jeden Abruf gilt die gesetzliche Mindestdauer der Beschäftigung am Stück. Entgeltfortzahlung bei Krankheit und an Feiertagen richtet sich nach dem Durchschnitt der letzten Monate.`,
+    ].join("\n"),
+    textEn: (w, k) => [
+      `(1) ${k.vorname} works on demand. The minimum weekly working time is ${w.mindestStunden || "[number]"} hours.${zahl(w.mehrProzent) ? ` The Employer may call up to an additional ${prozentEn(anteil(w.mehrProzent)!)} of this.` : ""}${zahl(w.wenigerProzent) ? ` If a maximum working time is agreed, the Employer calls at least ${prozentEn(1 - anteil(w.wenigerProzent)!)} of it.` : ""}`,
+      `(2) Work may only be called within the following time frame: ${frei(w.zeitrahmen) || "[time frame]"}. The Employer notifies the timing of the working hours at least ${zahlEn(zahl(w.ankuendigungTage) ?? WERTE.abruf.ankuendigungTage)} days in advance; otherwise ${k.vorname} is not obliged to work.`,
+      `(3) For each call, the statutory minimum period of consecutive work applies. Continued pay during sickness and on public holidays is based on the average of the preceding months.`,
     ].join("\n"),
     normen: ["§ 12 TzBfG", "§ 2 Abs. 1 Satz 2 Nr. 9 NachwG"],
     quellen: ["https://www.gesetze-im-internet.de/tzbfg/__12.html", "https://www.gesetze-im-internet.de/nachwg/__2.html", katalog("C9")],
@@ -592,7 +786,7 @@ export const BAUSTEINE_BC: Baustein[] = [
     ],
   },
   {
-    id: "C10", gruppe: "C", label: "Kurzarbeit", risiko: "gelb", version: 1, fuer: ARBEITNEHMER,
+    id: "C10", gruppe: "C", label: "Kurzarbeit", labelEn: "Short-time work", risiko: "gelb", version: 2, fuer: ARBEITNEHMER,
     passt: "Firmen mit schwankender Auslastung, für den Fall der Krise.",
     felder: [
       { id: "voraussetzung", label: "Voraussetzung", typ: "auswahl", pflicht: true,
@@ -601,16 +795,31 @@ export const BAUSTEINE_BC: Baustein[] = [
       { id: "hoechstMonate", label: "Höchstdauer in Monaten", typ: "zahl", pflicht: true, min: 1, hinweis: "Nicht länger als Kurzarbeitergeld gezahlt wird." },
       { id: "umfang", label: "Umfang der Verkürzung", typ: "auswahl", pflicht: true, optionen: ["teilweise Verkürzung", "Verkürzung bis auf null"] },
       { id: "aufstockung", label: "Aufstockung des Kurzarbeitergelds (Prozent des ausfallenden Nettoentgelts)", typ: "prozent", min: 0, max: 100 },
+      { id: "anpassungTage", label: "Ankündigung einer Änderung oder des vorzeitigen Endes (Kalendertage vorher)", typ: "zahl", pflicht: true, min: 1, standard: "3" },
+      { id: "urlaubKuerzung", label: "Urlaub für Zeiten ohne Arbeit (Kurzarbeit null) anteilig kürzen", typ: "janein", standard: "nein", bei: { umfang: ["Verkürzung bis auf null"] }, hinweis: "Nach der Rechtsprechung zulässig (Aktenzeichen prüfen). Ohne Wahl bleibt der Urlaub voll." },
     ],
-    text: (w, k) => [
-      `(1) Der Arbeitgeber kann Kurzarbeit nur einführen, wenn folgende Voraussetzung vorliegt: ${w.voraussetzung || "[Voraussetzung]"}. Kurzarbeit setzt voraus, dass für ${k.vorname} Kurzarbeitergeld gezahlt werden kann.`,
-      `(2) Der Arbeitgeber kündigt Kurzarbeit mindestens ${w.ankuendigungTage || "[Zahl]"} Kalendertage vorher in Textform an. Sie dauert höchstens ${monateText(zahl(w.hoechstMonate) ?? 1)} und endet früher, wenn kein Kurzarbeitergeld mehr gezahlt wird.`,
-      `(3) Umfang: ${w.umfang || "[Umfang]"}. Das Entgelt sinkt im Verhältnis der ausfallenden Arbeitszeit.${zahl(w.aufstockung) ? ` Der Arbeitgeber stockt das Kurzarbeitergeld um ${prozent(anteil(w.aufstockung)!)} des ausfallenden Nettoentgelts auf.` : ""}`,
-      `(4) Rechte eines Betriebsrats bleiben unberührt.`,
-    ].join("\n"),
-    normen: ["§§ 95 ff. SGB III", "§ 87 Abs. 1 Nr. 3 BetrVG"],
+    // Entscheidung 24: Nachzahlung, Anpassung mit Ankündigung und wahlweise Urlaubskürzung bei Kurzarbeit null, Nummern laufen mit.
+    text: (w, k) => nummeriert([
+      `Der Arbeitgeber kann Kurzarbeit nur einführen, wenn folgende Voraussetzung vorliegt: ${w.voraussetzung || "[Voraussetzung]"}. Kurzarbeit setzt voraus, dass für ${k.vorname} Kurzarbeitergeld gezahlt werden kann.`,
+      `Der Arbeitgeber kündigt Kurzarbeit mindestens ${w.ankuendigungTage || "[Zahl]"} Kalendertage vorher in Textform an. Sie dauert höchstens ${monateText(zahl(w.hoechstMonate) ?? 1)} und endet früher, wenn kein Kurzarbeitergeld mehr gezahlt wird.`,
+      `Umfang: ${w.umfang || "[Umfang]"}. Das Entgelt sinkt im Verhältnis der ausfallenden Arbeitszeit.${zahl(w.aufstockung) ? ` Der Arbeitgeber stockt das Kurzarbeitergeld um ${prozent(anteil(w.aufstockung)!)} des ausfallenden Nettoentgelts auf.` : ""}`,
+      "Lehnt die Agentur für Arbeit das Kurzarbeitergeld aus Gründen ab, die der Arbeitgeber zu vertreten hat, gilt die Kurzarbeit als nicht eingeführt; der Arbeitgeber zahlt das ausgefallene Entgelt nach.",
+      `Ändert sich der Arbeitsausfall, kann der Arbeitgeber Umfang und Lage der Kurzarbeit anpassen oder sie vorzeitig beenden. Er kündigt das mindestens ${w.anpassungTage || "[Zahl]"} Kalendertage vorher in Textform an.`,
+      ...(w.umfang === "Verkürzung bis auf null" && w.urlaubKuerzung === "ja" ? ["Für Zeiten, in denen die Arbeit wegen Kurzarbeit vollständig ausfällt, verringert sich der Urlaubsanspruch im Verhältnis der ausgefallenen Arbeitstage."] : []),
+      "Rechte eines Betriebsrats bleiben unberührt.",
+    ]),
+    textEn: (w, k) => nummeriert([
+      `The Employer may only introduce short-time work if the following condition is met: ${wahlEn(C10_VORAUSSETZUNG_EN, w.voraussetzung, "[condition]")}. Short-time work requires that short-time allowance (Kurzarbeitergeld) can be paid for ${k.vorname}.`,
+      `The Employer gives at least ${w.ankuendigungTage || "[number]"} calendar days' notice of short-time work in text form. It lasts no longer than ${monateEn(zahl(w.hoechstMonate) ?? 1)} and ends earlier if short-time allowance is no longer paid.`,
+      `Extent: ${wahlEn(C10_UMFANG_EN, w.umfang, "[extent]")}. Pay is reduced in proportion to the working time lost.${zahl(w.aufstockung) ? ` The Employer tops up the short-time allowance by ${prozentEn(anteil(w.aufstockung)!)} of the net pay lost.` : ""}`,
+      "If the Federal Employment Agency refuses short-time allowance for reasons for which the Employer is responsible, short-time work is deemed not to have been introduced; the Employer pays the lost remuneration retrospectively.",
+      `If the loss of work changes, the Employer may adjust the extent and timing of short-time work or end it early. It gives at least ${w.anpassungTage || "[number]"} calendar days' notice of this in text form.`,
+      ...(w.umfang === "Verkürzung bis auf null" && w.urlaubKuerzung === "ja" ? ["For periods in which work is lost entirely due to short-time work, the holiday entitlement is reduced in proportion to the working days lost."] : []),
+      "The rights of a works council remain unaffected.",
+    ]),
+    normen: ["§§ 95 ff. SGB III", "§ 87 Abs. 1 Nr. 3 BetrVG", "§ 615 BGB"],
     quellen: ["https://www.gesetze-im-internet.de/sgb_3/__95.html", "https://www.gesetze-im-internet.de/betrvg/__87.html", katalog("C10")],
-    urteile: [{ az: "BAG-Linie: Kurzarbeitsklauseln nur mit klaren Voraussetzungen, Ankündigungsfrist und Begrenzung, Aktenzeichen prüfen", kennung: "P" }],
+    urteile: [{ az: "BAG-Linie: Kurzarbeitsklauseln nur mit klaren Voraussetzungen, Ankündigungsfrist und Begrenzung, Aktenzeichen prüfen", kennung: "P" }, { az: "EuGH C-229/11 und BAG 9 AZR 225/21 (Urlaub bei Kurzarbeit null)", kennung: "P" }],
     schutz: ["Voraussetzung, Ankündigungsfrist und Höchstdauer sind Pflicht.", "Hinweis: Kurzarbeit wirkt nur mit Zustimmung der Person (dieser Vertrag) oder kollektiver Grundlage."],
     sperren: ["Kurzarbeit nach Ermessen ohne Voraussetzungen.", "Verkürzung auf null ohne Kurzarbeitergeld."],
     stichwoerter: ["Kurzarbeit", "Kurzarbeitergeld", "Kug", "Arbeitsausfall", "Krise", "Auftragsmangel"],
@@ -626,7 +835,7 @@ export const BAUSTEINE_BC: Baustein[] = [
     ],
   },
   {
-    id: "C11", gruppe: "C", label: "Nacht-, Sonn- und Feiertagsarbeit, Zuschläge", risiko: "grün", version: 1, fuer: ARBEITNEHMER,
+    id: "C11", gruppe: "C", label: "Nacht-, Sonn- und Feiertagsarbeit, Zuschläge", labelEn: "Night, Sunday and public holiday work, premiums", risiko: "grün", version: 1, fuer: ARBEITNEHMER,
     passt: "Schicht, Pflege, Gastronomie, Veranstaltungen.",
     felder: [
       { id: "nachtAusgleich", label: "Ausgleich für Nachtarbeit", typ: "auswahl", pflicht: true, standard: "Zuschlag", optionen: ["Zuschlag", "bezahlte freie Tage"] },
@@ -640,6 +849,11 @@ export const BAUSTEINE_BC: Baustein[] = [
       `(2) Sonn- und Feiertagsarbeit leistet ${k.vorname} nur, soweit das Arbeitszeitgesetz sie erlaubt. Dafür gibt es einen Ersatzruhetag.${zahl(w.sonntagZuschlag) ? ` Für Sonntagsarbeit zahlt der Arbeitgeber einen Zuschlag von ${prozent(anteil(w.sonntagZuschlag)!)}.` : ""}${zahl(w.feiertagZuschlag) ? ` Für Feiertagsarbeit zahlt er einen Zuschlag von ${prozent(anteil(w.feiertagZuschlag)!)}.` : ""}`,
       `(3) Bezugsgröße der Zuschläge ist der Grundstundenlohn. Ob Zuschläge steuerfrei sind, richtet sich nach dem Steuerrecht und ist nicht Inhalt dieses Vertrags.`,
     ].join("\n"),
+    textEn: (w, k) => [
+      `(1) For work during night time (${uhrEn(WERTE.arbzgNachtzeit.vonStunde)} to ${uhrEn(WERTE.arbzgNachtzeit.bisStunde)}), ${k.vorname} receives ${w.nachtAusgleich === "bezahlte freie Tage" ? `${w.freieTage || "[number]"} paid days off per year` : `a premium of ${prozentEn(anteil(w.nachtZuschlag) ?? 0)} on the basic hourly rate`}.`,
+      `(2) ${k.vorname} works on Sundays and public holidays only to the extent permitted by the Working Hours Act. A substitute rest day is granted for such work.${zahl(w.sonntagZuschlag) ? ` For Sunday work, the Employer pays a premium of ${prozentEn(anteil(w.sonntagZuschlag)!)}.` : ""}${zahl(w.feiertagZuschlag) ? ` For public holiday work, it pays a premium of ${prozentEn(anteil(w.feiertagZuschlag)!)}.` : ""}`,
+      `(3) The premiums are calculated on the basic hourly rate. Whether premiums are tax-free is governed by tax law and is not part of this contract.`,
+    ].join("\n"),
     normen: ["§ 6 Abs. 5 ArbZG", "§§ 9 bis 11 ArbZG", "§ 3b EStG (Hinweis)"],
     quellen: ["https://www.gesetze-im-internet.de/arbzg/__6.html", "https://www.gesetze-im-internet.de/arbzg/__10.html", "https://www.gesetze-im-internet.de/arbzg/__11.html", katalog("C11")],
     schutz: ["Nachtzuschlag oder Freizeitausgleich ist Pflicht, Warnung wenn er fehlt."],
@@ -647,7 +861,7 @@ export const BAUSTEINE_BC: Baustein[] = [
     stichwoerter: ["Nachtzuschlag", "Sonntagszuschlag", "Feiertagszuschlag", "Zuschläge", "Nachtarbeit", "Wochenende"],
   },
   {
-    id: "C12", gruppe: "C", label: "Jahresarbeitszeit, Langzeitkonto, Sabbatical", risiko: "gelb", version: 1, fuer: ARBEITNEHMER,
+    id: "C12", gruppe: "C", label: "Jahresarbeitszeit, Langzeitkonto, Sabbatical", labelEn: "Annual working time, long-term account, sabbatical", risiko: "gelb", version: 1, fuer: ARBEITNEHMER,
     passt: "Firmen mit Saisongeschäft und Zeitwertkonten.",
     felder: [
       { id: "art", label: "Art", typ: "auswahl", pflicht: true, optionen: ["Wertguthaben (Zeitwertkonto)", "Jahresarbeitszeitkonto", "Sabbatical"] },
@@ -662,6 +876,13 @@ export const BAUSTEINE_BC: Baustein[] = [
       `(3) Entnahme: ${w.entnahme || "[Entnahme]"}. Während der Freistellung zahlt der Arbeitgeber das Entgelt aus dem Guthaben, mindestens den gesetzlichen Mindestlohn für die angesparten Stunden.`,
       `(4) Das Guthaben ist gegen Insolvenz gesichert: ${w.insolvenz || "[Sicherung]"}. Ein Verfall von Guthaben ist ausgeschlossen. Endet das Arbeitsverhältnis, wird das Guthaben ausgezahlt oder übertragen.`,
       `(5) Steuerliche und sozialversicherungsrechtliche Fragen klärt der Arbeitgeber mit seiner Steuerberatung.`,
+    ].join("\n"),
+    textEn: (w, k) => [
+      `(1) An account is kept for ${k.vorname}: ${wahlEn(C12_ART_EN, w.art, "[type]")}. The account is kept ${wahlEn(C12_BEWERTUNG_EN, w.bewertung, "in money")}.`,
+      `(2) Saving phase: ${frei(w.anspar) || "[saving phase]"}.`,
+      `(3) Withdrawal: ${frei(w.entnahme) || "[withdrawal]"}. During the release from work, the Employer pays remuneration from the credit balance, and at least the statutory minimum wage for the hours saved.`,
+      `(4) The credit balance is protected against insolvency: ${wahlEn(C12_INSOLVENZ_EN, w.insolvenz, "[protection]")}. Credit balances do not lapse. If the employment ends, the credit balance is paid out or transferred.`,
+      `(5) The Employer clarifies tax and social security questions with its tax adviser.`,
     ].join("\n"),
     normen: ["§ 7b SGB IV", "§ 7e SGB IV", "§ 2 MiLoG"],
     quellen: ["https://www.gesetze-im-internet.de/sgb_4/__7b.html", "https://www.gesetze-im-internet.de/sgb_4/__7e.html", katalog("C12")],

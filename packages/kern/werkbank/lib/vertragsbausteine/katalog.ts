@@ -1,5 +1,5 @@
 /**
- * Der Katalog: alle 126 Bausteine der Gruppen A bis S, die allgemeinen Regeln und die Sperrkombinationen an einer Stelle.
+ * Der Katalog: alle 127 Bausteine der Gruppen A bis S, die allgemeinen Regeln und die Sperrkombinationen an einer Stelle.
  * Jeder Baustein bekommt automatisch das Feld „Eigene Ergänzung“: Was dort steht, ist ungeprüft (P-003) und wird gegen die rote Liste gelesen.
  */
 import type { Baustein, Feld, Regel } from "./typen";

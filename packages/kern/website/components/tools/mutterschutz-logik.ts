@@ -83,3 +83,15 @@ export function berechneGeburt(o: { et: string; geb: string; frueh: boolean; meh
 
   return { errors, et, geb, vorBeginn, entb, nachEnde, nach, verkuerzt, kEnde, kEnde4, schwBeginn, phasen, hinweise, lang, gesamt: diffDays(vorEnde ? vorBeginn : addDays(entb, 1), nachEnde) + 1 };
 }
+
+/**
+ * Ausschnitt des Zeitstrahls (Design-Review 28.10.2026): Das Kündigungsverbot beginnt mit der Schwangerschaft, rund 9 Monate
+ * vor den Schutzfristen. Die Achse startet deshalb höchstens 4 Wochen vor der ersten Schutzfrist, nie vor dem Verbot.
+ */
+export function achsenAusschnitt(phasen: Phase[], kVon: Date, kBis: Date): { start: Date; ende: Date; verbotVorStart: boolean } {
+  const erste = phasen.reduce((a, p) => (p.von < a ? p.von : a), kBis);
+  const frueh = addDays(erste, -28);
+  const start = kVon > frueh ? kVon : frueh;
+  const ende = phasen.reduce((a, p) => (p.bis > a ? p.bis : a), kBis);
+  return { start, ende, verbotVorStart: kVon < start };
+}

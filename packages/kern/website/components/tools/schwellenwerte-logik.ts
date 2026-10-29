@@ -1,4 +1,5 @@
 /** Reine Logik des Schwellenwerte-Checks. */
+import { zahl } from "./format";
 
 export type SwEingabe = {
   /** Arbeitnehmer nach Köpfen ohne Azubis */
@@ -39,20 +40,22 @@ export type Regel = {
   /** true: Pflicht entfällt oberhalb der Grenze (z. B. U1), Text "gilt bis" */
   bis?: boolean;
   folge: string;
+  /** Satz zur Zählbasis, wenn sie nicht die Kopfzahl ist (für den Satz zur nächsten Schwelle) */
+  basis?: string;
 };
 
 export const REGELN: Regel[] = [
   { id: "br", thema: "Betriebsrat kann gewählt werden", gesetz: "§ 1 BetrVG", op: ">=", grenze: 5, bezug: "Betrieb", zaehlweise: "ständige wahlberechtigte Arbeitnehmer ab 16 Jahren, Azubis zählen mit, Teilzeit voll", wert: (e) => e.koepfe + e.azubis, folge: "Die Belegschaft darf einen Betriebsrat wählen. Du musst ihn nicht einrichten, darfst die Wahl aber nicht behindern. Mindestens drei Personen müssen wählbar sein (6 Monate dabei, ab 18 Jahren)." },
   { id: "pause", thema: "Pausenraum", gesetz: "ArbStättV Anhang Nr. 4.2", op: ">", grenze: 10, bezug: "Betrieb", zaehlweise: "Beschäftigte nach Köpfen, Azubis zählen mit", wert: (e) => e.koepfe + e.azubis, folge: "Du brauchst einen Pausenraum oder einen gleichwertigen Pausenbereich. Ausnahme: Büros, in denen man sich in der Pause genauso gut erholen kann." },
-  { id: "kschg", thema: "Kündigungsschutzgesetz gilt", gesetz: "§ 23 Abs. 1 KSchG", op: ">", grenze: 10, bezug: "Betrieb", zaehlweise: "Arbeitnehmer ohne Azubis, bis 20 Std. = 0,5, bis 30 Std. = 0,75", wert: gewichtet, folge: "Nach 6 Monaten Betriebszugehörigkeit brauchst du für jede Kündigung einen Grund (Person, Verhalten oder Betrieb) und bei betriebsbedingten Kündigungen eine Sozialauswahl." },
+  { id: "kschg", thema: "Kündigungsschutzgesetz gilt", gesetz: "§ 23 Abs. 1 KSchG", op: ">", grenze: 10, bezug: "Betrieb", zaehlweise: "Arbeitnehmer ohne Azubis, bis 20 Std. = 0,5, bis 30 Std. = 0,75", wert: gewichtet, basis: "Für das Kündigungsschutzgesetz zählt Teilzeit nur anteilig, Azubis zählen nicht.", folge: "Nach 6 Monaten Betriebszugehörigkeit brauchst du für jede Kündigung einen Grund (Person, Verhalten oder Betrieb) und bei betriebsbedingten Kündigungen eine Sozialauswahl." },
   { id: "tzbfg", thema: "Anspruch auf Teilzeit", gesetz: "§ 8 Abs. 7 TzBfG", op: ">", grenze: 15, bezug: "Arbeitgeber", zaehlweise: "Arbeitnehmer nach Köpfen ohne Azubis", wert: (e) => e.koepfe, folge: "Wer länger als 6 Monate dabei ist, kann dauerhafte Teilzeit verlangen. Ablehnen darfst du nur aus betrieblichen Gründen und fristgerecht." },
   { id: "beeg", thema: "Anspruch auf Teilzeit in Elternzeit", gesetz: "§ 15 Abs. 7 BEEG", op: ">", grenze: 15, bezug: "Arbeitgeber", zaehlweise: "Arbeitnehmer nach Köpfen ohne Azubis", wert: (e) => e.koepfe, folge: "Eltern können während der Elternzeit 15 bis 32 Wochenstunden verlangen. Ablehnen nur aus dringenden betrieblichen Gründen, innerhalb von 4 bzw. 8 Wochen." },
   { id: "pflegezg", thema: "Anspruch auf Pflegezeit", gesetz: "§ 3 Abs. 1 PflegeZG", op: ">", grenze: 15, bezug: "Arbeitgeber", zaehlweise: "Beschäftigte nach Köpfen, Azubis zählen mit", wert: (e) => e.koepfe + e.azubis, folge: "Beschäftigte können sich bis zu 6 Monate ganz oder teilweise freistellen lassen, um Angehörige zu pflegen. Ab Ankündigung gilt Sonderkündigungsschutz." },
   { id: "u1", thema: "U1-Umlage (Erstattung Entgeltfortzahlung)", gesetz: "§§ 1, 3 AAG", op: ">", grenze: 30, bis: true, bezug: "Arbeitgeber", zaehlweise: "ohne Azubis und schwerbehinderte Menschen, bis 10 Std. = 0,25, bis 20 Std. = 0,5, bis 30 Std. = 0,75; maßgeblich ist das Vorjahr (mindestens 8 Monate)", wert: gewichtetU1, folge: "Bis 30 nimmst du am Umlageverfahren U1 teil: Du zahlst die Umlage und bekommst einen Teil der Entgeltfortzahlung bei Krankheit erstattet. Darüber entfällt beides." },
   { id: "kleinbetrieb", thema: "Kürzere vertragliche Kündigungsfrist erlaubt (Kleinbetrieb)", gesetz: "§ 622 Abs. 5 Satz 1 Nr. 2 BGB", op: ">", grenze: 20, bis: true, bezug: "Arbeitgeber", zaehlweise: "Arbeitnehmer ohne Azubis, bis 20 Std. = 0,5, bis 30 Std. = 0,75", wert: gewichtet, folge: "Bis 20 darfst du im Vertrag eine Grundkündigungsfrist von 4 Wochen ohne festen Endtermin (15. oder Monatsende) vereinbaren. Darüber gilt der Endtermin zwingend." },
-  { id: "sgb9", thema: "Beschäftigungspflicht schwerbehinderter Menschen", gesetz: "§§ 154, 156, 157 SGB IX", op: ">=", grenze: 20, bezug: "Arbeitgeber", zaehlweise: "Arbeitsplätze im Jahresdurchschnitt, Stellen unter 18 Wochenstunden und Ausbildungsstellen zählen nicht", wert: (e) => e.plaetze18 ?? Math.max(0, e.koepfe - e.bis10 - e.bis20), folge: "Mindestens 5 Prozent der Arbeitsplätze mit schwerbehinderten Menschen besetzen (20 bis 39 Plätze: 1, 40 bis 59 Plätze: 2). Für jeden unbesetzten Pflichtplatz zahlst du Ausgleichsabgabe, Anzeige bis 31. März für das Vorjahr." },
-  { id: "dsb", thema: "Datenschutzbeauftragter", gesetz: "§ 38 Abs. 1 BDSG", op: ">=", grenze: 20, bezug: "Unternehmen", zaehlweise: "Personen, die in der Regel ständig mit automatisierter Verarbeitung personenbezogener Daten beschäftigt sind, egal ob Teilzeit, Azubi oder freie Mitarbeit", wert: (e) => e.datenPersonen ?? 0, folge: "Du musst eine Datenschutzbeauftragte oder einen Datenschutzbeauftragten benennen (intern oder extern) und der Aufsichtsbehörde melden. Unabhängig von der Zahl gilt das, wenn ihr eine Datenschutz-Folgenabschätzung braucht." },
-  { id: "ass", thema: "Arbeitsschutzausschuss", gesetz: "§ 11 ASiG", op: ">", grenze: 20, bezug: "Betrieb", zaehlweise: "Beschäftigte, bis 20 Std. = 0,5, bis 30 Std. = 0,75, Azubis zählen mit", wert: (e) => gewichtet(e) + e.azubis, folge: "Bilde einen Arbeitsschutzausschuss mit Fachkraft für Arbeitssicherheit, Betriebsarzt, Sicherheitsbeauftragten und, falls vorhanden, zwei Betriebsratsmitgliedern. Er tagt mindestens einmal im Quartal." },
+  { id: "sgb9", thema: "Beschäftigungspflicht schwerbehinderter Menschen", gesetz: "§§ 154, 156, 157 SGB IX", op: ">=", grenze: 20, bezug: "Arbeitgeber", zaehlweise: "Arbeitsplätze im Jahresdurchschnitt, Stellen unter 18 Wochenstunden und Ausbildungsstellen zählen nicht", wert: (e) => e.plaetze18 ?? Math.max(0, e.koepfe - e.bis10 - e.bis20), basis: "Für die Schwerbehindertenquote zählen nur Arbeitsplätze ab 18 Wochenstunden ohne Ausbildungsstellen.", folge: "Mindestens 5 Prozent der Arbeitsplätze mit schwerbehinderten Menschen besetzen (20 bis 39 Plätze: 1, 40 bis 59 Plätze: 2). Für jeden unbesetzten Pflichtplatz zahlst du Ausgleichsabgabe, Anzeige bis 31. März für das Vorjahr." },
+  { id: "dsb", thema: "Datenschutzbeauftragter", gesetz: "§ 38 Abs. 1 BDSG", op: ">=", grenze: 20, bezug: "Unternehmen", zaehlweise: "Personen, die in der Regel ständig mit automatisierter Verarbeitung personenbezogener Daten beschäftigt sind, egal ob Teilzeit, Azubi oder freie Mitarbeit", wert: (e) => e.datenPersonen ?? 0, basis: "Für den Datenschutzbeauftragten zählen nur Personen, die ständig mit Personendaten arbeiten.", folge: "Du musst eine Datenschutzbeauftragte oder einen Datenschutzbeauftragten benennen (intern oder extern) und der Aufsichtsbehörde melden. Unabhängig von der Zahl gilt das, wenn ihr eine Datenschutz-Folgenabschätzung braucht." },
+  { id: "ass", thema: "Arbeitsschutzausschuss", gesetz: "§ 11 ASiG", op: ">", grenze: 20, bezug: "Betrieb", zaehlweise: "Beschäftigte, bis 20 Std. = 0,5, bis 30 Std. = 0,75, Azubis zählen mit", wert: (e) => gewichtet(e) + e.azubis, basis: "Für den Arbeitsschutzausschuss zählt Teilzeit nur anteilig, Azubis zählen mit.", folge: "Bilde einen Arbeitsschutzausschuss mit Fachkraft für Arbeitssicherheit, Betriebsarzt, Sicherheitsbeauftragten und, falls vorhanden, zwei Betriebsratsmitgliedern. Er tagt mindestens einmal im Quartal." },
   { id: "mel17", thema: "Massenentlassungsanzeige möglich", gesetz: "§ 17 Abs. 1 KSchG", op: ">", grenze: 20, bezug: "Betrieb", zaehlweise: "Arbeitnehmer nach Köpfen, Teilzeit zählt voll", wert: (e) => e.koepfe, folge: "Entlässt du innerhalb von 30 Tagen mehr Menschen als die Staffel erlaubt (bei 21 bis 59 Beschäftigten mehr als 5), musst du das vorher der Agentur für Arbeit anzeigen. Auch Aufhebungsverträge auf Veranlassung des Arbeitgebers zählen mit. Fehler können die Kündigungen unwirksam machen." },
   { id: "br99", thema: "Zustimmung des Betriebsrats bei Einstellung und Versetzung", gesetz: "§ 99 BetrVG", op: ">", grenze: 20, nurMitBr: true, bezug: "Unternehmen", zaehlweise: "wahlberechtigte Arbeitnehmer, Azubis zählen mit", wert: (e) => e.koepfe + e.azubis, folge: "Vor jeder Einstellung, Eingruppierung, Umgruppierung und Versetzung brauchst du die Zustimmung des Betriebsrats." },
   { id: "br111", thema: "Interessenausgleich und Sozialplan bei Betriebsänderungen", gesetz: "§ 111 BetrVG", op: ">", grenze: 20, nurMitBr: true, bezug: "Unternehmen", zaehlweise: "wahlberechtigte Arbeitnehmer, Azubis zählen mit", wert: (e) => e.koepfe + e.azubis, folge: "Bei Stilllegung, Verlegung oder größerem Personalabbau musst du mit dem Betriebsrat über einen Interessenausgleich verhandeln. Ein Sozialplan kann erzwungen werden." },
@@ -137,3 +140,23 @@ export function mitKoepfen(f: Record<SwFeld, string>, k: number): Record<SwFeld,
   if (n(f.schwerbehindert) > k) neu.schwerbehindert = String(k);
   return neu;
 }
+
+/** Wie mitKoepfen, begrenzt zusätzlich die Personen mit Personendaten auf Köpfe plus Azubis. Für Regler, Schnellwahl und Tippen. */
+export function setzeKoepfe(f: Record<SwFeld, string>, k: number): Record<SwFeld, string> {
+  const neu = mitKoepfen(f, k);
+  const max = k + (Number(f.azubis) || 0);
+  if ((Number(f.daten) || 0) > max) neu.daten = String(max);
+  return neu;
+}
+
+/** "1 Kopf", "2 Köpfe", "0,5 gewichtete Köpfe" */
+export const fehltText = (n: number) => `${zahl(n)} ${!Number.isInteger(n) ? "gewichtete Köpfe" : n === 1 ? "Kopf" : "Köpfe"}`;
+
+/** Erster Satz eines Textes. Trennt nur vor einem Großbuchstaben, damit "(15. oder Monatsende)" ganz bleibt. */
+export const kurzfassung = (t: string) => t.split(/(?<=\.)\s+(?=[A-ZÄÖÜ])/)[0];
+
+/**
+ * Beschriftete Werte der Skala (UX-Review 28.10.2026): Zwischen 5 und 30 lagen die Zahlen übereinander,
+ * am Handy fielen 15 und 25 weg. Jetzt überall dieselbe Auswahl, die übrigen Schwellen nur als Strich.
+ */
+export const SKALA_BESCHRIFTET = [5, 10, 20, 30, 50, 100, 200];

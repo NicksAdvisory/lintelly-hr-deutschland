@@ -1,7 +1,7 @@
 /** Urlaub aus den Rechnern von lintelly.com/tools. Die Rechnung des Anspruchs steht in packages/kern, der Hinweis zum Verfall hier. */
 import { fmt, parseYmd, toYmd } from "../../../kern/website/components/tools/datum";
 import { zahl as dezimal } from "../../../kern/website/components/tools/format";
-import { berechneUrlaub } from "../../../kern/website/components/tools/urlaubsanspruch-logik";
+import { berechneUrlaub, pruefeWechsel } from "../../../kern/website/components/tools/urlaubsanspruch-logik";
 import { antwort, normQuelle, registerQuelle } from "../antwort";
 import { datum, janein, schema, text, zahl } from "../eingabe";
 import type { Werkzeug } from "../werkzeug";
@@ -34,6 +34,8 @@ const urlaubsanspruch: Werkzeug = {
     const jahr = e.jahr ?? Number(heute.slice(0, 4));
     const quellen = [registerQuelle("mindesturlaub", heute), registerQuelle("urlaubWartezeitMonate", heute)];
     if (e.wechsel_ab && e.wechsel_tage === undefined) return antwort({ ergebnis: { fehler: ["Zum Wechsel fehlen die neuen Arbeitstage pro Woche (wechsel_tage)."] }, quellen }, heute);
+    const wechselFehler = e.wechsel_ab && pruefeWechsel(e.wechsel_ab, jahr, e.eintritt ?? null, e.austritt ?? null);
+    if (wechselFehler) return antwort({ ergebnis: { fehler: [wechselFehler] }, quellen }, heute);
     let r;
     try {
       r = berechneUrlaub({

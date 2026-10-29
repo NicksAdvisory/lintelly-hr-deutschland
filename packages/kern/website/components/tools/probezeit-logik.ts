@@ -10,7 +10,10 @@ export type ProbezeitInput = { beginn: string; einheit: Einheit; dauer: number; 
 export function berechneProbezeit(i: ProbezeitInput) {
   const beginn = parseYmd(i.beginn);
   if (!beginn) return { fehler: { beginn: "Gib das Datum des ersten Arbeitstags ein." } } as const;
-  if (!Number.isFinite(i.dauer) || i.dauer <= 0 || !Number.isInteger(i.dauer)) return { fehler: { dauer: "Gib die Probezeit als ganze Zahl ein." } } as const;
+  if (!Number.isFinite(i.dauer) || i.dauer <= 0 || !Number.isInteger(i.dauer)) {
+    const bereich = i.einheit === "monate" ? `1 bis ${i.azubi ? 4 : 6} Monate` : `1 bis ${i.azubi ? 17 : 26} Wochen`;
+    return { fehler: { dauer: `Gib die Probezeit als ganze Zahl ein, ${bereich}.` } } as const;
+  }
   const ende = i.einheit === "monate" ? periodEnd(beginn, i.dauer) : addDays(beginn, i.dauer * 7 - 1);
   if (i.azubi) {
     // § 20 BBiG: Probezeit mindestens 1, höchstens 4 Monate
@@ -34,13 +37,16 @@ export function berechneProbezeit(i: ProbezeitInput) {
     befristetBis = parseYmd(i.befristetBis);
     if (!befristetBis) return { fehler: { befristetBis: "Gib das Enddatum der Befristung ein." } } as const;
     if (befristetBis <= beginn) return { fehler: { befristetBis: "Das Ende der Befristung muss nach dem Arbeitsbeginn liegen." } } as const;
+    if (ende > befristetBis) return { fehler: { dauer: `Die Probezeit endet nach dem Vertragsende. Der Vertrag endet am ${fmt(befristetBis)}, die Probezeit erst am ${fmt(ende)}.` } } as const;
   }
   // § 22 Abs. 1 BBiG: In der Probezeit kündigen beide Seiten ohne Frist
   const kuendEnde = i.azubi ? ende : addDays(ende, 14);
   const wartezeitEnde = periodEnd(beginn, 6);
   const kschgAb = addDays(wartezeitEnde, 1);
-  const gespraech = addDays(ende, -28);
-  const entscheidung = addDays(ende, -14);
+  // Termine nie vor den ersten Arbeitstag: bei kurzer Probezeit entfällt erst das Gespräch, dann auch die Entscheidung
+  const vorBeginnNull = (d: Date) => (d < beginn ? null : d);
+  const gespraech = vorBeginnNull(addDays(ende, -28));
+  const entscheidung = vorBeginnNull(addDays(ende, -14));
   // Zugang am Wochenende ist riskant: letzter Werktag davor (Mo bis Fr) als Empfehlung
   let zugangEmpf = ende;
   while (zugangEmpf.getUTCDay() === 0 || zugangEmpf.getUTCDay() === 6) zugangEmpf = addDays(zugangEmpf, -1);

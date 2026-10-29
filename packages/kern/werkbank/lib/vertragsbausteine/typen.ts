@@ -1,7 +1,7 @@
 /**
  * Vertragsbausteine (Klauselkatalog 10.10.2026, 2026-10-09-modul-review/vertragsbausteine-katalog.md): Typen für alle Gruppen.
  * Rein, ohne Datenbank. Jeder Baustein ist Daten: Kennung, Gruppe, Eingaben mit Grenzen, Textbaustein in eigenem Wortlaut,
- * Normen, Quellen, Risiko und die Prüfregeln (P-001 bis P-104) und Sperrkombinationen (K-01 bis K-40), die an ihm hängen.
+ * Normen, Quellen, Risiko und die Prüfregeln (P-001 bis P-108) und Sperrkombinationen (K-01 bis K-40), die an ihm hängen.
  * Kein Text hier ist Endwortlaut: Die Kanzlei gibt jede Bausteinversion frei, bevor eine Firma sie nutzt.
  */
 import type { Beschaeftigung } from "@/lib/types";
@@ -69,7 +69,7 @@ export type Lage = {
   firma: { betriebsrat: boolean; mitarbeiter: number; ohneBv?: string[] };
   /** Tag der Prüfung (Vertragsdatum). */
   heute: string;
-  /** Freigabe der Kanzlei je Baustein und Version, z. B. { "D5@1": "2026-10-12" }. */
+  /** Freigabe der Kanzlei je Baustein und Version, z. B. { "D5@1+en": "2026-10-12" }. */
   freigaben?: Record<string, string>;
   /** Name der Kanzlei zu jeder Freigabe in `freigaben` (gleicher Schlüssel). */
   freigabeKanzlei?: Record<string, string>;
@@ -77,7 +77,7 @@ export type Lage = {
 
 export type BefundArt = "sperre" | "warnung" | "pflicht" | "hinweis";
 export type Befund = {
-  /** Kennung der Regel (P-001 bis P-104, K-01 bis K-40). */
+  /** Kennung der Regel (P-001 bis P-108, K-01 bis K-40). */
   regel: string;
   art: BefundArt;
   text: string;
@@ -126,6 +126,13 @@ export type Baustein = {
   felder: Feld[];
   /** Text in eigenem Wortlaut, ohne Überschrift. Pflichtsätze (Schutzgeländer) stehen immer drin. */
   text: (w: Werte, k: TextKontext) => string;
+  /** Feste englische Überschrift für zweisprachige Verträge (Nick 23.10.2026). */
+  labelEn: string;
+  /**
+   * Feste englische Fassung von `text`, Absatz für Absatz gleich gegliedert. Freie Eingaben (Felder "text" und "lang") mit `frei()` aus
+   * lib/dokumente/englisch.ts markieren, die übersetzt die KI. Maßgeblich bleibt der deutsche Text, Prüfregeln laufen nur auf ihm.
+   */
+  textEn: (w: Werte, k: TextKontext) => string;
   normen: string[];
   /** Amtliche Fundstellen oder Abschnitt des Katalogs. */
   quellen: string[];
@@ -143,7 +150,7 @@ export type Baustein = {
   ersetzt?: string;
   /** Suchwörter für die Suche im Dialog und in Frag Lintelly. */
   stichwoerter?: string[];
-  /** Version des Bausteintexts; die Freigabe der Kanzlei gilt je Version. */
+  /** Version des Bausteintexts, deutsch und englisch zusammen: jede Änderung an `text` oder `textEn` erhöht sie. Die Freigabe der Kanzlei gilt je Version. */
   version: number;
 };
 

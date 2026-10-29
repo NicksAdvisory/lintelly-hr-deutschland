@@ -45,6 +45,7 @@ export function pruefeTage(tage: Tag[], o: { jugend: boolean; ausnahme: boolean;
     const base: TagErgebnis = { id: t.id, label, arbeit: 0, pause: 0, soll: 0, ruhe: null, level: "ok", msgs: [], leer: false };
     if (!t.von && !t.bis) { ergebnisse.push({ ...base, leer: true }); prevIdx = idx; return; }
     if (s === null || e === null) { ergebnisse.push({ ...base, leer: true, fehler: "Bitte Beginn und Ende als Uhrzeit eingeben." }); prevIdx = idx; return; }
+    if (s === e) { ergebnisse.push({ ...base, leer: true, fehler: "Beginn und Ende sind gleich." }); prevIdx = idx; return; }
     if (d && prevIdx >= 0 && idx <= prevIdx) { ergebnisse.push({ ...base, leer: true, fehler: "Die Tage müssen zeitlich aufeinander folgen." }); return; }
     if (e <= s) e += 1440; // Schicht über Mitternacht
     const dauer = e - s;
@@ -126,6 +127,8 @@ export function pruefeTage(tage: Tag[], o: { jugend: boolean; ausnahme: boolean;
   });
 
   const voll = ergebnisse.filter((r) => !r.leer);
+  // Tage mit Eingabefehler: im Ergebnis nennen statt still weglassen
+  const nichtGeprueft = ergebnisse.filter((r) => r.fehler).map((r) => ({ label: r.label, fehler: r.fehler! }));
   const wocheMax = o.jugend ? STAND_2026.jug.woche : STAND_2026.erw.woche;
   const vollste = [...wochen.values()].sort((a, b) => b.summe - a.summe)[0];
   const inWoche = vollste?.montag ? `in der Woche ab ${fmt(vollste.montag)}` : "in 7 eingetragenen Tagen";
@@ -134,5 +137,5 @@ export function pruefeTage(tage: Tag[], o: { jugend: boolean; ausnahme: boolean;
       ? { level: o.jugend ? "late" : "due", text: o.jugend ? `${hm(vollste.summe)} ${inWoche}. Jugendliche dürfen höchstens 40 Stunden pro Woche arbeiten (§ 8 Abs. 1 JArbSchG).` : `${hm(vollste.summe)} ${inWoche}. Im Durchschnitt sind höchstens 48 Stunden pro Woche erlaubt (6 Werktage zu 8 Stunden).` }
       : null;
   const gesamt = worst([...voll.map((r) => r.level), ...(wocheMsg ? [wocheMsg.level] : [])]);
-  return { ergebnisse, voll, summe, wocheMsg, gesamt };
+  return { ergebnisse, voll, nichtGeprueft, summe, wocheMsg, gesamt };
 }

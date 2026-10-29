@@ -355,6 +355,8 @@ const W: { [K in keyof typeof WERTE]: Angabe } = {
   sonderzahlungBindung: r("Gratifikation: Bindung nach Höhe der Zahlung", "Vergütung und Provision", "§ 307 BGB, Linie des BAG", null, { k: true }),
   vertragsstrafeGrenze: r("Vertragsstrafe bei Vertragsbruch: Höhe höchstens", "Wettbewerb und Vertragsstrafe", "BAG 8 AZR 65/05, BAG 8 AZR 897/08, § 307 BGB", BAG("8-azr-897-08"), { k: true }),
   rufbereitschaftReaktionMinuten: r("Rufbereitschaft: Warnung bei kurzer Reaktionszeit", "Arbeitszeit", "EuGH C-518/15 (Matzak)", null, { k: true }),
+  unbezahlterUrlaubSvMonate: g("Unbezahlter Urlaub: Beschäftigung in der Sozialversicherung gilt fort, längstens", "Lohn und Sozialversicherung", "§ 7 Abs. 3 Satz 1 SGB IV", gii("sgb_4", "7"), { k: true }),
+  sonderurlaubUrlaubsrechnung: r("Unbezahlter Sonderurlaub: Umrechnung des Urlaubs nach Arbeitstagen", "Urlaub", "BAG 9 AZR 315/17", BAG("9-azr-315-17"), { k: true }),
   provisionStandards: l("Provision und Bonus: Standards der Bausteine", "Vergütung und Provision"),
   vertragStandards: l("Vertragsbausteine: Standards für Fristen und Warnwerte", "Kündigung und Vertrag"),
   // Strang 29: Firmenwagen. Gesetz am 11.10.2026 im Wortlaut gelesen; BMF-Schreiben und LStR über das Lohnsteuer-Handbuch 2026.

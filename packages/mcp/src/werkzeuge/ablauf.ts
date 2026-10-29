@@ -432,7 +432,9 @@ const workflow_vorlage: Werkzeug = {
     const tage = Object.fromEntries(Object.entries(w.tage).map(([k, t]) => [k, t.wert]));
     return antwort({
       ergebnis: {
-        kennung: w.id, name: w.name, nutzen: w.nutzen, kette: kette(w, tage),
+        kennung: w.id, name: w.name, nutzen: w.nutzen,
+        // „Erinnerung in Mein Lintelly“ gibt es ohne Lintelly-Konto nicht: hier nur „Erinnerung“ (Werkbank 28.10.2026).
+        kette: kette(w, tage).map((k) => ({ ...k, dann: k.dann.map((d) => d.replace(" in Mein Lintelly", "")) })),
         tage: Object.values(w.tage).map((t) => ({ was: t.label, standard: t.wert })),
         ...(w.gesundheit ? { vertraulich: "Gesundheit: Aufgaben nur für die Person, die das Personal macht, keine Mitteilung an Führungskräfte." } : {}),
         einordnung: "So fasst die Lintelly-Werkbank nach. Nimm die Kette als Vorlage für deinen eigenen Ablauf, zum Beispiel mit Erinnerungen im Kalender.",

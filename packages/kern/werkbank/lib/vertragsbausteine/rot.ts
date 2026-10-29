@@ -23,7 +23,8 @@ export const ROTE_LISTE: RoteKlausel[] = [
   { id: "R8", klausel: "Stichtags- oder Bindungsklausel bei Zahlungen, die Arbeit vergüten (Provision, Zielbonus, 13. Gehalt mit Mischcharakter, Tantieme)", grund: "BAG 10 AZR 612/10, 10 AZR 848/12", alternative: "Anteilige Zahlung bei Ein- und Austritt (Pro rata); Stichtag nur bei reiner Betriebstreue (D18 mit D19)", bausteine: ["D18", "D19"],
     muster: [/(provision|bonus|tantieme|13\.\s*gehalt|dreizehnt)[^.]{0,80}(ungekündigt|stichtag|nur wer am)/i, /ungekündigt[^.]{0,60}(provision|bonus|tantieme)/i, /stichtagsklausel/i] },
   { id: "R9", klausel: "Doppelte Schriftformklausel", grund: "BAG 9 AZR 382/07 (Aktenzeichen prüfen), § 305b BGB", alternative: "Änderungen in Textform mit Vorrang der Individualabrede (Q4)", bausteine: ["Q4"],
-    muster: [/(auch|selbst) (für )?(die )?aufhebung (dieser|der) (schriftform|klausel)/i, /doppelte schriftform/i, /schriftformklausel[^.]{0,40}(selbst|auch)/i] },
+    // Entscheidung 24: auch "Aufhebung dieses Formerfordernisses" und "Aufhebung des Schriftformerfordernisses".
+    muster: [/(auch|selbst) (für )?(die )?aufhebung (dieser|der) (schriftform|klausel)/i, /aufhebung (dieses|des|eines) (schrift)?form(erfordernisses|zwangs)/i, /doppelte schriftform/i, /schriftformklausel[^.]{0,40}(selbst|auch)/i] },
   { id: "R10", klausel: "Schiedsabrede für Streitigkeiten aus dem Arbeitsverhältnis", grund: "§ 101 ArbGG (aus bekannter Fassung, Kanzlei prüfen)", alternative: "Gesetzlicher Gerichtsstand vor dem Arbeitsgericht (Q5)", bausteine: ["Q5"],
     muster: [/schiedsgericht|schiedsabrede|schiedsverfahren|schiedsklausel/i] },
   { id: "R11", klausel: "Verzicht auf Kündigungsschutzklage im Voraus; Tatsachenbestätigung, die die Beweislast ändert", grund: "§ 4 KSchG, § 309 Nr. 12 BGB", alternative: "Empfangsbestätigung auf eigener Seite mit eigener Unterschrift (Q7)", bausteine: ["Q7"],

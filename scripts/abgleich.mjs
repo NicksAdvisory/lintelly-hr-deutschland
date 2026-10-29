@@ -18,11 +18,11 @@ if (pruefen && !(existsSync(WERKBANK) && existsSync(WEBSITE))) {
 }
 
 const AUS_WERKBANK = [
-  "lib/types.ts", "lib/format.ts", "lib/heute.ts", "lib/sofortmeldung.ts",
+  "lib/types.ts", "lib/format.ts", "lib/heute.ts", "lib/sofortmeldung.ts", "lib/dokumente/englisch.ts",
   ...["datum", "werte", "register", "rechtszahlen", "fundstellen", "mindestlohn", "dienstwagen", "dienstrad"].map((f) => `lib/regeln/${f}.ts`),
   ...["allgemein", "empfehlung", "gruppe-a", "gruppe-bc", "gruppe-d-fest", "gruppe-d-variabel", "gruppe-efgh", "gruppe-ijk", "gruppe-lmn",
-    "gruppe-opqs", "hilfen", "katalog", "provision", "pruefen", "rot", "typen"].map((f) => `lib/vertragsbausteine/${f}.ts`),
-  ...["kern", "vorlagen", "anzeige"].map((f) => `lib/workflows/${f}.ts`),
+    "gruppe-opqs", "hilfen", "katalog", "provision", "pruefen", "rot", "typen", "kanzlei", "eingabe"].map((f) => `lib/vertragsbausteine/${f}.ts`),
+  ...["kern", "vorlagen", "anzeige", "bauen"].map((f) => `lib/workflows/${f}.ts`),
   "lib/module/plaene.ts",
   ...["running-list-a15", "umbau-29-dienstwagen-rechner", "workflow-kern", "workflow-vorlagen"].map((f) => `tests/${f}.test.ts`),
   ...["hilfe.ts", "allgemein.test.ts", "gruppe-a-c.test.ts", "gruppe-d.test.ts", "gruppe-e-k.test.ts", "gruppe-l-s.test.ts", "provision.test.ts"]
@@ -33,11 +33,12 @@ const AUS_WEBSITE = [
   ...["abfindung", "arbeitszeugnis", "aufbewahrungsfristen", "ausgleichsabgabe", "befristung", "bem", "elternzeit", "entgeltfortzahlung", "minijob",
     "mutterschutz", "pausen", "probezeit", "schwellenwerte", "sonderkuendigungsschutz", "urlaubsabgeltung", "urlaubsanspruch"]
     .map((f) => `components/tools/${f}-logik.ts`),
-  "components/tools/datum.ts", "components/tools/format.ts", "components/tools/stellenanzeigen-agg.ts",
-  ...["test-fristen", "test-geld", "test-tools", "test-tools-logik", "test-urlaub"].map((f) => `scripts/${f}.mjs`),
+  "components/tools/datum.ts", "components/tools/format.ts", "components/tools/stellenanzeigen-agg.ts", "components/tools/sensibel.ts",
+  ...["test-fristen", "test-geld", "test-tools", "test-tools-logik", "test-urlaub", "test-ux-fristen", "test-ux-geld", "test-ux-pflichten", "test-ux-trennung"]
+    .map((f) => `scripts/${f}.mjs`),
 ];
 
-// Zwei Dateien entstehen als Auszug, weil ihr Original Datenbank oder React mitbringt: nur die Typen, die die Kopien brauchen.
+// Drei Dateien entstehen als Auszug, weil ihr Original Datenbank, React oder eine Log-Datei mitbringt: nur, was die Kopien brauchen.
 function auszug(text, anfang, ende) {
   const a = text.indexOf(anfang), e = text.indexOf(ende, a);
   if (a < 0 || e < 0) throw new Error(`Auszug nicht gefunden: ${anfang}`);
@@ -51,6 +52,11 @@ const AUSZUEGE = [
   {
     ziel: "website/components/tools/ui.ts", quelle: path.join(WEBSITE, "components/tools/ui.tsx"),
     bau: (t) => `/** Auszug aus components/tools/ui.tsx von lintelly.com: nur der Typ Level (scripts/abgleich.mjs). */\n${auszug(t, "export type Level", ";")}\n`,
+  },
+  {
+    // Das Original schreibt data/logs/fehler.log. Der MCP schreibt keine Dateien beim Nutzer: hier nur auf die Konsole (stderr).
+    ziel: "werkbank/lib/fehler.ts", quelle: path.join(WERKBANK, "lib/fehler.ts"),
+    bau: (t) => `/** Auszug aus lib/fehler.ts der Werkbank: nur logFehler, ohne Log-Datei, nur stderr (scripts/abgleich.mjs). */\n${auszug(t, "export function logFehler", "\n}")}\n\n${auszug(t, "const art =", ";\n")}${auszug(t, "const stelle =", ";\n")}const ausgeben = (zeile: string) => console.error(zeile);\n`,
   },
 ];
 

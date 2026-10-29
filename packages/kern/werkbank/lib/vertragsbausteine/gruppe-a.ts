@@ -7,8 +7,13 @@ import { addDays, addMonths, compare, formatDE, isISODate } from "@/lib/regeln/d
 import type { Baustein, Lage } from "./typen";
 import { ARBEITNEHMER } from "./typen";
 import { hat, innerhalbMonate, leer, num, regel, wenn, wert, zahl } from "./hilfen";
+import { anzahlEn, datumEn, frei, fristWortEn, zahlwortEn } from "@/lib/dokumente/englisch";
 
 const datumText = (s: string | undefined) => (s && isISODate(s) ? formatDE(s) : "[Datum]");
+const datumTextEn = (s: string | undefined) => (s && isISODate(s) ? datumEn(s) : "[date]");
+const monateEn = (n: number) => anzahlEn(n, "month", "months");
+/** Englische Fassung eines Auswahlwerts; unbekannte Werte gehen als freie Eingabe an die Übersetzung. */
+const en = (karte: Record<string, string>, v: string | undefined, platzhalter: string) => (v ? karte[v] ?? frei(v) : platzhalter);
 const katalog = (id: string) => `Katalog Abschnitt 4, Baustein ${id}`;
 
 /* A6: Bedingungen nur aus dieser Liste (§ 14 Abs. 1 TzBfG über § 21 TzBfG). */
@@ -33,6 +38,32 @@ const A4_SONSTIGE = "sonstige Stelle ohne besonderen Bezug";
 const A4_LISTE = ["Vermögensverantwortung", "Sicherheitsbezug", "Zugang zu besonders schutzwürdigen Daten", A4_KINDER, A4_GESETZ, A4_SONSTIGE];
 const A4_ERWEITERT = "erweitertes Führungszeugnis (§ 30a BZRG)";
 
+/* Englische Fassungen der Auswahlwerte. */
+const A1_EN: Record<string, string> = {
+  "Aufenthaltstitel, der die Beschäftigung erlaubt": "a residence title that permits employment",
+  "Zustimmung der Bundesagentur für Arbeit": "approval of the Federal Employment Agency",
+  "Visum zur Beschäftigung": "a visa for the purpose of employment",
+};
+const A2_EN: Record<string, string> = {
+  "Approbation oder Berufserlaubnis": "licence to practise (Approbation) or professional permit",
+  "staatliche Anerkennung des Berufsabschlusses": "state recognition of the professional qualification",
+  "Fahrerlaubnis der nötigen Klasse": "a driving licence of the required class",
+  "Gefahrgut- oder Fachkundenachweis": "a dangerous goods or specialist competence certificate",
+  "Prüfbescheinigung (z. B. Schweißerprüfung)": "a test certificate (e.g. welder qualification test)",
+};
+const A3_EN: Record<string, string> = {
+  [A3_LISTE[0]]: "initial medical examination for young persons (§ 32 JArbSchG)",
+  [A3_LISTE[1]]: "instruction on the handling of food (§ 43 IfSG)",
+  [A3_LISTE[2]]: "mandatory occupational health screening under the ArbMedVV",
+  [A3_LISTE[3]]: "statutory fitness assessment (driving, control and monitoring activities)",
+};
+const A5_EN: Record<string, string> = {
+  "Zuverlässigkeitsüberprüfung nach dem Luftsicherheitsgesetz": "background check under the Aviation Security Act (LuftSiG)",
+  "Sicherheitsüberprüfung nach dem Sicherheitsüberprüfungsgesetz": "security clearance under the Security Clearance Act (SÜG)",
+  "Zuverlässigkeitsprüfung im Bewachungsgewerbe (GewO)": "reliability check for the security services trade (GewO)",
+  "Zuverlässigkeitsüberprüfung nach dem Atomgesetz": "background check under the Atomic Energy Act (AtG)",
+};
+
 /* A7 */
 const A7_AUS = "ausgeschlossen für beide Seiten";
 const A7_FRIST = "zulässig mit Frist";
@@ -41,6 +72,16 @@ const A7_FRIST = "zulässig mit Frist";
 export const A9_SACHGRUND = "Zeitbefristung mit Sachgrund";
 export const A9_OHNE = "Zeitbefristung ohne Sachgrund";
 export const A9_ZWECK = "Zweckbefristung";
+const A9_GRUENDE_EN: Record<string, string> = {
+  "vorübergehender betrieblicher Bedarf": "temporary operational need",
+  "Anschluss an Ausbildung oder Studium": "transition following vocational training or university studies",
+  "Vertretung": "temporary cover for another employee",
+  "Eigenart der Arbeitsleistung": "nature of the work",
+  "Erprobung": "trial employment",
+  "Gründe in der Person": "reasons relating to the Employee personally",
+  "Vergütung aus befristeten Haushaltsmitteln": "remuneration from fixed-term budget funds",
+  "gerichtlicher Vergleich": "court settlement",
+};
 const A9_GRUENDE = [
   "vorübergehender betrieblicher Bedarf", "Anschluss an Ausbildung oder Studium", "Vertretung", "Eigenart der Arbeitsleistung",
   "Erprobung", "Gründe in der Person", "Vergütung aus befristeten Haushaltsmitteln", "gerichtlicher Vergleich",
@@ -54,7 +95,7 @@ const fenster = () => monateTextDativ(WERTE.vorbeschaeftigungAbstandMonate.wert)
 
 export const BAUSTEINE_A: Baustein[] = [
   {
-    id: "A1", gruppe: "A", label: "Aufschiebende Bedingung: Aufenthaltstitel und Arbeitserlaubnis", risiko: "grün", version: 1, fuer: ARBEITNEHMER,
+    id: "A1", gruppe: "A", label: "Aufschiebende Bedingung: Aufenthaltstitel und Arbeitserlaubnis", labelEn: "Condition precedent: residence title and work permit", risiko: "grün", version: 1, fuer: ARBEITNEHMER,
     passt: "Bei Beschäftigten ohne EU-, EWR- oder Schweizer Staatsangehörigkeit, solange der Titel zu Vertragsbeginn noch nicht vorliegt.",
     felder: [
       { id: "nachweis", label: "Art des Nachweises", typ: "auswahl", pflicht: true, standard: "Aufenthaltstitel, der die Beschäftigung erlaubt",
@@ -71,6 +112,14 @@ export const BAUSTEINE_A: Baustein[] = [
         : `(3) Liegt der Nachweis bis zum ${datumText(w.hoechstdatum)} nicht vor, kann jede Seite den Vertrag ohne Frist als gegenstandslos erklären.`,
       `(4) Der Arbeitgeber bewahrt für die Dauer der Beschäftigung eine Kopie des Titels auf. ${k.vorname} teilt jede Änderung, Verlängerung oder das Ende des Titels unverzüglich mit.`,
     ].join("\n"),
+    textEn: (w, k) => [
+      `(1) This contract only takes effect when ${k.vorname} presents the following proof to the Employer no later than ${datumTextEn(w.hoechstdatum)}: ${en(A1_EN, w.nachweis, "[proof]")}.`,
+      `(2) Until this condition is met, the Employer will not employ ${k.vorname}, and there is no entitlement to employment or remuneration. Any agreed probationary period only begins with the actual start of work.`,
+      w.folge === "Beginn verschiebt sich bis höchstens zum Höchstdatum"
+        ? `(3) If the proof is not available on the agreed start date, the start is postponed to the day after it is presented, but no later than ${datumTextEn(w.hoechstdatum)}. If it is still not available by then, either party may declare the contract void without notice.`
+        : `(3) If the proof is not available by ${datumTextEn(w.hoechstdatum)}, either party may declare the contract void without notice.`,
+      `(4) The Employer keeps a copy of the title for the duration of the employment. ${k.vorname} reports any change, extension or expiry of the title without undue delay.`,
+    ].join("\n"),
     normen: ["§ 158 Abs. 1 BGB", "§ 4a Abs. 5 AufenthG"],
     quellen: ["https://www.gesetze-im-internet.de/bgb/__158.html", "https://www.gesetze-im-internet.de/aufenthg_2004/__4a.html", katalog("A1")],
     schutz: ["Bedingung nennt den Nachweis und ein Höchstdatum.", "Keine Beschäftigung vor Eintritt der Bedingung.", "Hinweis an HR: Kopie des Titels aufbewahren, Ablaufdatum in die Fristenliste."],
@@ -86,7 +135,7 @@ export const BAUSTEINE_A: Baustein[] = [
     ],
   },
   {
-    id: "A2", gruppe: "A", label: "Aufschiebende Bedingung: Qualifikation, Erlaubnis oder Approbation", risiko: "grün", version: 1, fuer: ARBEITNEHMER,
+    id: "A2", gruppe: "A", label: "Aufschiebende Bedingung: Qualifikation, Erlaubnis oder Approbation", labelEn: "Condition precedent: qualification, permit or licence to practise", risiko: "grün", version: 1, fuer: ARBEITNEHMER,
     passt: "Reglementierte Berufe und Stellen, für die ein Nachweis zwingend ist (Pflege, Ärzte, Steuerberatung, Fahrerlaubnis, Gefahrgut, Schweißerprüfung).",
     felder: [
       { id: "nachweis", label: "Nachweis", typ: "auswahl", pflicht: true,
@@ -108,6 +157,17 @@ export const BAUSTEINE_A: Baustein[] = [
         `(4) Fällt der Nachweis später weg, teilt ${k.vorname} das dem Arbeitgeber unverzüglich mit.`,
       ].join("\n");
     },
+    textEn: (w, k) => {
+      const n = w.nachweis === "anderer Nachweis" ? frei(w.nachweisText) || "[proof]" : en(A2_EN, w.nachweis, "[proof]");
+      return [
+        `(1) This contract only takes effect when ${k.vorname} presents the following proof to the Employer no later than ${datumTextEn(w.hoechstdatum)}, which is mandatory for the agreed work: ${n}.`,
+        `(2) Until this condition is met, there is no entitlement to employment or remuneration. Any agreed probationary period only begins with the actual start of work.`,
+        w.folge === "Beginn verschiebt sich bis höchstens zum Höchstdatum"
+          ? `(3) If the proof is not available on the agreed start date, the start is postponed to the day after it is presented, but no later than ${datumTextEn(w.hoechstdatum)}. After that, either party may declare the contract void without notice.`
+          : `(3) If the proof is not available by ${datumTextEn(w.hoechstdatum)}, either party may declare the contract void without notice.`,
+        `(4) If the proof later ceases to be valid, ${k.vorname} informs the Employer without undue delay.`,
+      ].join("\n");
+    },
     normen: ["§ 158 Abs. 1 BGB", "Berufsgesetze", "§ 21 TzBfG (nur bei auflösender Bedingung)"],
     quellen: ["https://www.gesetze-im-internet.de/bgb/__158.html", katalog("A2")],
     schutz: ["Bedingung muss objektiv zur Stelle gehören (Stellenbeschreibung verknüpft).", "Höchstdatum ist Pflicht."],
@@ -115,7 +175,7 @@ export const BAUSTEINE_A: Baustein[] = [
     stichwoerter: ["Approbation", "Berufserlaubnis", "Anerkennung", "Führerschein", "Fahrerlaubnis", "Qualifikation", "Nachweis", "Pflege", "Bedingung"],
   },
   {
-    id: "A3", gruppe: "A", label: "Aufschiebende Bedingung: Einstellungsuntersuchung (nur gesetzlich vorgeschrieben)", risiko: "gelb", version: 1, fuer: ARBEITNEHMER,
+    id: "A3", gruppe: "A", label: "Aufschiebende Bedingung: Einstellungsuntersuchung (nur gesetzlich vorgeschrieben)", labelEn: "Condition precedent: pre-employment medical examination (statutory only)", risiko: "gelb", version: 1, fuer: ARBEITNEHMER,
     passt: "Nur wo ein Gesetz die Untersuchung vor Beginn vorschreibt: Jugendliche, Lebensmittel, Pflichtvorsorge, gesetzliche Eignungsfeststellung.",
     felder: [
       { id: "grundlage", label: "Rechtsgrundlage", typ: "auswahl", pflicht: true, optionen: A3_LISTE, hinweis: "Ein freier Grund wird nicht angeboten. Eine allgemeine Einstellungsuntersuchung ohne Gesetz geht nur mit freiwilliger, getrennter Einwilligung." },
@@ -125,6 +185,11 @@ export const BAUSTEINE_A: Baustein[] = [
       `(1) Voraussetzung für den Beginn der Beschäftigung ist die gesetzlich vorgeschriebene Untersuchung oder Belehrung: ${w.grundlage || "[Rechtsgrundlage]"}. Sie findet bis zum ${datumText(w.frist)} statt.`,
       `(2) Der Arbeitgeber erfährt nur, ob ${k.vorname} für die Tätigkeit geeignet oder nicht geeignet ist oder ob gesundheitliche Bedenken bestehen. Diagnosen und Befunde erfährt er nicht. Bei arbeitsmedizinischer Vorsorge erhält er nur die Bescheinigung, dass die Vorsorge stattgefunden hat.`,
       `(3) Die Kosten trägt der Arbeitgeber.`,
+    ].join("\n"),
+    textEn: (w, k) => [
+      `(1) Employment begins only after the following statutory examination or instruction: ${en(A3_EN, w.grundlage, "[legal basis]")}. It takes place by ${datumTextEn(w.frist)}.`,
+      `(2) The Employer is only told whether ${k.vorname} is fit or unfit for the work or whether there are health concerns. The Employer is not told any diagnoses or findings. For occupational health screening, the Employer only receives confirmation that the screening has taken place.`,
+      `(3) The Employer bears the costs.`,
     ].join("\n"),
     normen: ["§ 158 Abs. 1 BGB", "ArbMedVV", "§ 32 JArbSchG", "§ 43 IfSG", "Art. 9 DSGVO", "§ 26 Abs. 3 BDSG"],
     quellen: ["https://www.gesetze-im-internet.de/arbmedvv/__6.html", "https://www.gesetze-im-internet.de/jarbschg/__32.html", "https://www.gesetze-im-internet.de/ifsg/__43.html", katalog("A3")],
@@ -138,7 +203,7 @@ export const BAUSTEINE_A: Baustein[] = [
     ],
   },
   {
-    id: "A4", gruppe: "A", label: "Aufschiebende Bedingung: Führungszeugnis", risiko: "gelb", version: 1, fuer: ARBEITNEHMER,
+    id: "A4", gruppe: "A", label: "Aufschiebende Bedingung: Führungszeugnis", labelEn: "Condition precedent: certificate of good conduct", risiko: "gelb", version: 1, fuer: ARBEITNEHMER,
     passt: "Stellen mit Geld und Vermögen in verantwortlicher Stellung, schutzwürdigen Daten, Sicherheitsberufen oder Arbeit mit Kindern und Jugendlichen.",
     felder: [
       { id: "art", label: "Art des Führungszeugnisses", typ: "auswahl", pflicht: true, standard: "einfaches Führungszeugnis (§ 30 BZRG)", optionen: ["einfaches Führungszeugnis (§ 30 BZRG)", A4_ERWEITERT] },
@@ -150,6 +215,11 @@ export const BAUSTEINE_A: Baustein[] = [
       `(1) Voraussetzung für den Beginn der Beschäftigung ist, dass ${k.vorname} bis zum ${datumText(w.frist)} ein ${w.art === A4_ERWEITERT ? "erweitertes " : ""}Führungszeugnis vorlegt, das keine für die Stelle einschlägigen Eintragungen enthält.`,
       ...(w.art === A4_ERWEITERT ? [`(2) Der Arbeitgeber fordert das erweiterte Führungszeugnis schriftlich an und bestätigt darin, dass die Voraussetzungen nach § 30a Abs. 1 BZRG vorliegen.`] : []),
       `(${w.art === A4_ERWEITERT ? 3 : 2}) Der Arbeitgeber nimmt keine Kopie zur Akte. Er vermerkt nur, dass er das Zeugnis eingesehen hat und ob einschlägige Eintragungen bestehen, und löscht den Vermerk, sobald er nicht mehr gebraucht wird.`,
+    ].join("\n"),
+    textEn: (w, k) => [
+      `(1) Employment begins only if ${k.vorname} presents ${w.art === A4_ERWEITERT ? "an extended" : "a"} certificate of good conduct (${w.art === A4_ERWEITERT ? "erweitertes Führungszeugnis" : "Führungszeugnis"}) by ${datumTextEn(w.frist)} that contains no entries relevant to the position.`,
+      ...(w.art === A4_ERWEITERT ? [`(2) The Employer requests the extended certificate in writing and confirms in that request that the requirements of § 30a para. 1 BZRG are met.`] : []),
+      `(${w.art === A4_ERWEITERT ? 3 : 2}) The Employer does not keep a copy on file. It only notes that it has inspected the certificate and whether relevant entries exist, and deletes this note as soon as it is no longer needed.`,
     ].join("\n"),
     normen: ["§ 30 BZRG", "§ 30a BZRG", "Art. 10 DSGVO", "§ 26 BDSG"],
     quellen: ["https://www.gesetze-im-internet.de/bzrg/__30.html", "https://www.gesetze-im-internet.de/bzrg/__30a.html", katalog("A4")],
@@ -166,7 +236,7 @@ export const BAUSTEINE_A: Baustein[] = [
     ],
   },
   {
-    id: "A5", gruppe: "A", label: "Aufschiebende Bedingung: Zuverlässigkeits- oder Sicherheitsüberprüfung", risiko: "gelb", version: 1, fuer: ARBEITNEHMER,
+    id: "A5", gruppe: "A", label: "Aufschiebende Bedingung: Zuverlässigkeits- oder Sicherheitsüberprüfung", labelEn: "Condition precedent: background check or security clearance", risiko: "gelb", version: 1, fuer: ARBEITNEHMER,
     passt: "Luftsicherheit, Sicherheitsgewerbe, Sicherheitsbereiche mit gesetzlicher Überprüfungspflicht.",
     felder: [
       { id: "grundlage", label: "Rechtsgrundlage", typ: "auswahl", pflicht: true,
@@ -179,6 +249,11 @@ export const BAUSTEINE_A: Baustein[] = [
       `(2) Die Überprüfung führt die zuständige Stelle nach dem Gesetz durch. Eine dafür nötige Einwilligung erklärt ${k.vorname} freiwillig und getrennt von diesem Vertrag. Sie ist nicht Bestandteil dieses Vertrags.`,
       `(3) Der Arbeitgeber erfährt nur das Ergebnis der Überprüfung.`,
     ].join("\n"),
+    textEn: (w, k) => [
+      `(1) Employment begins only after the following check has been successfully completed by ${datumTextEn(w.frist)}: ${en(A5_EN, w.grundlage, "[legal basis]")}.`,
+      `(2) The check is carried out by the competent authority under the applicable law. ${k.vorname} gives any consent required for it voluntarily and separately from this contract. That consent does not form part of this contract.`,
+      `(3) The Employer is only told the result of the check.`,
+    ].join("\n"),
     normen: ["§ 158 Abs. 1 BGB", "LuftSiG", "SÜG", "Art. 7 DSGVO", "§ 26 Abs. 2 BDSG"],
     quellen: ["https://www.gesetze-im-internet.de/luftsig/__7.html", "https://www.gesetze-im-internet.de/bdsg_2018/__26.html", katalog("A5")],
     schutz: ["Nur mit Rechtsgrundlage aus der Liste.", "Einwilligung getrennt, nicht im Arbeitsvertrag."],
@@ -186,7 +261,7 @@ export const BAUSTEINE_A: Baustein[] = [
     stichwoerter: ["Sicherheitsüberprüfung", "Zuverlässigkeitsüberprüfung", "Flughafen", "Luftsicherheit", "Bewachung", "Sicherheitsdienst", "Geheimschutz"],
   },
   {
-    id: "A6", gruppe: "A", label: "Auflösende Bedingung: Wegfall der Erlaubnis oder volle Erwerbsminderungsrente", risiko: "gelb", version: 1, fuer: ARBEITNEHMER, nass: true, befristung: true,
+    id: "A6", gruppe: "A", label: "Auflösende Bedingung: Wegfall der Erlaubnis oder volle Erwerbsminderungsrente", labelEn: "Condition subsequent: loss of permit or full disability pension", risiko: "gelb", version: 1, fuer: ARBEITNEHMER, nass: true, befristung: true,
     passt: "Stellen mit zwingender Erlaubnis oder Beendigung bei Bewilligung einer unbefristeten vollen Erwerbsminderungsrente.",
     felder: [
       { id: "bedingung", label: "Bedingung", typ: "auswahl", pflicht: true, optionen: A6_LISTE, hinweis: "Keine Bedingung, die an Krankheit, Schwangerschaft, Elternzeit oder Betriebsratsamt anknüpft." },
@@ -199,6 +274,15 @@ export const BAUSTEINE_A: Baustein[] = [
         `(2) Es endet frühestens ${fristWort(WERTE.zweckbefristungAuslaufTage.wert)} nach Zugang der schriftlichen Unterrichtung von ${k.vorname} durch den Arbeitgeber über den Eintritt der Bedingung.`,
         `(3) ${k.vorname} teilt den Eintritt der Bedingung unverzüglich in Textform mit. Ist ${k.vorname} schwerbehindert oder gleichgestellt, endet das Arbeitsverhältnis erst mit Zustimmung des Integrationsamts.`,
         `(4) Diese Vereinbarung bedarf der Schriftform und wird vor Arbeitsbeginn im Original unterschrieben.`,
+      ].join("\n");
+    },
+    textEn: (w, k) => {
+      const bed = w.bedingung === A6_WEGFALL ? `the permit required by law for the work (${frei(w.erlaubnis) || "[permit]"}) is permanently lost` : w.bedingung === A6_RENTE ? `${k.vorname} receives a decision granting an unlimited pension for full reduction in earning capacity` : "[condition]";
+      return [
+        `(1) The employment ends without notice of termination being required if ${bed}.`,
+        `(2) It ends no earlier than ${fristWortEn(WERTE.zweckbefristungAuslaufTage.wert)} after ${k.vorname} receives written notice from the Employer that the condition has been met.`,
+        `(3) ${k.vorname} reports the occurrence of the condition in text form without undue delay. If ${k.vorname} is severely disabled or has equivalent status, the employment only ends with the consent of the Integration Office (Integrationsamt).`,
+        `(4) This agreement must be in written form and is signed in the original before work begins.`,
       ].join("\n");
     },
     normen: ["§ 158 Abs. 2 BGB", "§ 21 TzBfG", "§ 14 Abs. 1 und 4 TzBfG", "§ 15 Abs. 2 TzBfG", "§ 17 TzBfG", "§ 175 SGB IX"],
@@ -226,7 +310,7 @@ export const BAUSTEINE_A: Baustein[] = [
     ],
   },
   {
-    id: "A7", gruppe: "A", label: "Kündigung vor Dienstantritt", risiko: "grün", version: 1, fuer: ARBEITNEHMER,
+    id: "A7", gruppe: "A", label: "Kündigung vor Dienstantritt", labelEn: "Termination before commencement of work", risiko: "grün", version: 1, fuer: ARBEITNEHMER,
     passt: "Immer, wenn geregelt werden soll, ob vor Beginn ordentlich gekündigt werden kann.",
     felder: [
       { id: "regel", label: "Ordentliche Kündigung vor Dienstantritt", typ: "auswahl", pflicht: true, standard: A7_AUS, optionen: [A7_AUS, A7_FRIST],
@@ -243,6 +327,16 @@ export const BAUSTEINE_A: Baustein[] = [
         `(2) Die Kündigung aus wichtigem Grund (§ 626 BGB) bleibt jederzeit möglich. Jede Kündigung bedarf der Schriftform (§ 623 BGB).`,
       ].join("\n");
     },
+    textEn: (w, k) => {
+      const n = zahl(w.fristMonate);
+      const frist = n ? monateEn(n) : fristWortEn(WERTE.probezeitKuendigungTage.wert);
+      return [
+        w.regel === A7_FRIST
+          ? `(1) Before the employment begins, the Employer and ${k.vorname} may give ordinary notice of termination with a notice period of ${frist}. The period begins when the notice is received.`
+          : `(1) The Employer and ${k.vorname} may not give ordinary notice of termination before the employment begins. This exclusion applies equally to both parties.`,
+        `(2) Termination for good cause (§ 626 BGB) remains possible at any time. Any termination must be in written form (§ 623 BGB).`,
+      ].join("\n");
+    },
     normen: ["§ 622 Abs. 6 BGB", "§ 623 BGB", "§ 626 BGB"],
     quellen: ["https://www.gesetze-im-internet.de/bgb/__622.html", "https://www.gesetze-im-internet.de/bgb/__626.html", katalog("A7")],
     urteile: [{ az: "BAG-Linie: Kündigung vor Dienstantritt zulässig, wenn nicht ausdrücklich ausgeschlossen, Aktenzeichen prüfen", kennung: "P" }],
@@ -257,7 +351,7 @@ export const BAUSTEINE_A: Baustein[] = [
     ],
   },
   {
-    id: "A8", gruppe: "A", label: "Probezeit (Varianten)", risiko: "grün", version: 1, fuer: ARBEITNEHMER,
+    id: "A8", gruppe: "A", label: "Probezeit (Varianten)", labelEn: "Probationary period (variants)", risiko: "grün", version: 1, fuer: ARBEITNEHMER,
     passt: "Standard. Der Baustein regelt Dauer und Frist der Probezeit genauer, auch kürzere Probezeit bei Befristung.",
     felder: [
       { id: "dauerMonate", label: "Dauer der Probezeit in Monaten", typ: "zahl", pflicht: true, min: 1, max: WERTE.probezeitHoechstMonate.wert, standard: String(WERTE.probezeitHoechstMonate.wert),
@@ -273,6 +367,15 @@ export const BAUSTEINE_A: Baustein[] = [
         `(3) Die Probezeit kann nur durch eine Vereinbarung beider Seiten vor ihrem Ablauf verlängert werden, höchstens bis zur gesetzlichen Höchstdauer. Eine einseitige Verlängerung durch den Arbeitgeber gibt es nicht.`,
       ].join("\n");
     },
+    textEn: (w, k) => {
+      const m = zahl(w.dauerMonate) ?? WERTE.probezeitHoechstMonate.wert;
+      const t = zahl(w.fristTage) ?? WERTE.probezeitKuendigungTage.wert;
+      return [
+        `(1) The first ${monateEn(m)} from the actual start of work are a probationary period.`,
+        `(2) During the probationary period, either party may terminate with a notice period of ${fristWortEn(t)}. It is sufficient if the notice is received on the last day of the probationary period.`,
+        `(3) The probationary period can only be extended by agreement of both parties before it expires, and at most up to the statutory maximum. The Employer cannot extend it unilaterally.`,
+      ].join("\n");
+    },
     normen: ["§ 622 Abs. 3 BGB", "§ 15 Abs. 3 TzBfG"],
     quellen: ["https://www.gesetze-im-internet.de/bgb/__622.html", "https://www.gesetze-im-internet.de/tzbfg/__15.html", katalog("A8")],
     schutz: ["Dauer höchstens bis zum Höchstwert aus dem Register.", "Bei Befristung im Verhältnis zur Laufzeit."],
@@ -280,7 +383,7 @@ export const BAUSTEINE_A: Baustein[] = [
     stichwoerter: ["Probezeit", "Probezeit verlängern", "Kündigungsfrist Probezeit", "Einarbeitung"],
   },
   {
-    id: "A9", gruppe: "A", label: "Befristung (Sachgrund, sachgrundlos, Zweckbefristung)", risiko: "gelb", version: 1, fuer: ARBEITNEHMER, nass: true, befristung: true,
+    id: "A9", gruppe: "A", label: "Befristung (Sachgrund, sachgrundlos, Zweckbefristung)", labelEn: "Fixed term (with objective reason, without objective reason, purpose-based)", risiko: "gelb", version: 1, fuer: ARBEITNEHMER, nass: true, befristung: true,
     passt: `Projekt, Vertretung, Saison oder sachgrundlos bis ${monateTextDativ(WERTE.befristungSachgrundlosMonate.wert)}.`,
     felder: [
       { id: "art", label: "Art der Befristung", typ: "auswahl", pflicht: true, optionen: [A9_SACHGRUND, A9_OHNE, A9_ZWECK] },
@@ -306,6 +409,21 @@ export const BAUSTEINE_A: Baustein[] = [
         `(${w.art === A9_OHNE ? 5 : 4}) ${k.vorname} muss sich spätestens ${zahlwort(WERTE.arbeitsuchendMeldung.monate)} Monate vor dem Ende bei der Agentur für Arbeit arbeitsuchend melden; liegen zwischen Kenntnis und Ende weniger als ${zahlwort(WERTE.arbeitsuchendMeldung.monate)} Monate, innerhalb von ${zahlwort(WERTE.arbeitsuchendMeldung.tage)} Tagen nach Kenntnis.`,
       ].join("\n");
     },
+    textEn: (w, k) => {
+      const grund = en(A9_GRUENDE_EN, w.sachgrund, "[objective reason]");
+      const abs1 = w.art === A9_ZWECK
+        ? `(1) The employment is limited to a specific purpose (${grund}, § 14 para. 1 TzBfG). It ends without notice of termination being required when the following purpose has been achieved: ${frei(w.zweck) || "[purpose]"}. It ends no earlier than ${fristWortEn(WERTE.zweckbefristungAuslaufTage.wert)} after ${k.vorname} receives written notice from the Employer of the date on which the purpose is achieved.`
+        : w.art === A9_OHNE
+          ? `(1) The employment is fixed-term without an objective reason (§ 14 para. 2 TzBfG) and ends on ${datumTextEn(w.ende)} without notice of termination being required. ${k.vorname} declares that there has been no previous employment relationship with the Employer that rules out a fixed term without an objective reason.`
+          : `(1) The employment is fixed-term for an objective reason (${grund}, § 14 para. 1 TzBfG) and ends on ${datumTextEn(w.ende)} without notice of termination being required.`;
+      return [
+        abs1,
+        `(2) The right of either party to give ordinary notice of termination under this contract remains unaffected.`,
+        `(3) The fixed term must be in written form. Both parties sign it in the original before work begins.`,
+        ...(w.art === A9_OHNE ? [`(4) An extension is only possible before the fixed term expires and without changing the other terms of employment.`] : []),
+        `(${w.art === A9_OHNE ? 5 : 4}) ${k.vorname} must register as a jobseeker with the Federal Employment Agency no later than ${zahlwortEn(WERTE.arbeitsuchendMeldung.monate)} months before the end; if there are fewer than ${zahlwortEn(WERTE.arbeitsuchendMeldung.monate)} months between becoming aware of the end and the end itself, within ${zahlwortEn(WERTE.arbeitsuchendMeldung.tage)} days of becoming aware.`,
+      ].join("\n");
+    },
     normen: ["§ 14 Abs. 1, 2 und 4 TzBfG", "§ 15 Abs. 2 TzBfG", "§ 38 Abs. 1 SGB III"],
     quellen: ["https://www.gesetze-im-internet.de/tzbfg/__14.html", "https://www.gesetze-im-internet.de/tzbfg/__15.html", "https://www.gesetze-im-internet.de/sgb_3/__38.html", katalog("A9")],
     urteile: [{ az: "BVerfG 1 BvL 7/14 (Vorbeschäftigungsverbot, Auslegung des § 14 Abs. 2 Satz 2 TzBfG)", kennung: "B" }, { az: "BAG 7 AZR 733/16 (Urteil vom 23.01.2019, Aufgabe der Dreijahresgrenze)", kennung: "B" }],
@@ -315,7 +433,9 @@ export const BAUSTEINE_A: Baustein[] = [
     regeln: [
       regel("P-017", "sperre", "A9 sachgrundlos und Vorbeschäftigung im Fenster (Personalakte)", "§ 14 Abs. 2 Satz 2 TzBfG", ["A9"], (l) => {
         const ende = l.person.vorbeschaeftigungEnde;
-        return wenn(sachgrundlos(l) && !!ende && imFenster(ende, l), `Laut Personalakte war die Person bis ${formatDE(ende!)} beschäftigt, also innerhalb von ${fenster()} vor dem Eintritt. Eine Befristung ohne Sachgrund ist dann gesperrt. Sicher ist eine Befristung mit Sachgrund oder ein unbefristeter Vertrag.`);
+        // Erst prüfen, dann den Text bauen: wenn() rechnet den Text auch ohne Datum und warf hier (Review 23.10.2026 B10).
+        if (!sachgrundlos(l) || !ende || !imFenster(ende, l)) return null;
+        return `Laut Personalakte war die Person bis ${formatDE(ende)} beschäftigt, also innerhalb von ${fenster()} vor dem Eintritt. Eine Befristung ohne Sachgrund ist dann gesperrt. Sicher ist eine Befristung mit Sachgrund oder ein unbefristeter Vertrag.`;
       }),
       regel("P-018", "sperre", "A9 sachgrundlos über Höchstdauer oder mit zu vielen Verlängerungen", "§ 14 Abs. 2 Satz 1 TzBfG", ["A9"], (l) => {
         if (!sachgrundlos(l)) return null;
@@ -350,7 +470,7 @@ export const BAUSTEINE_A: Baustein[] = [
     ],
   },
   {
-    id: "A10", gruppe: "A", label: "Erklärung zu Vorbeschäftigung und Nebenbeschäftigung", risiko: "grün", version: 1, fuer: ARBEITNEHMER,
+    id: "A10", gruppe: "A", label: "Erklärung zu Vorbeschäftigung und Nebenbeschäftigung", labelEn: "Declaration on prior employment and secondary employment", risiko: "grün", version: 1, fuer: ARBEITNEHMER,
     passt: "Immer sinnvoll, bei sachgrundloser Befristung zwingend.",
     felder: [
       { id: "vorbeschaeftigung", label: "Früher schon bei diesem Arbeitgeber beschäftigt (egal wie lange her)", typ: "janein", pflicht: true, standard: "nein" },
@@ -365,6 +485,15 @@ export const BAUSTEINE_A: Baustein[] = [
         `(2) Laufende Nebentätigkeiten: ${neben.length ? neben.join("; ") : "keine"}${zahl(w.nebenStunden) ? ` mit zusammen ${w.nebenStunden} Wochenstunden` : ""}.`,
         `(3) ${k.vorname} teilt Änderungen dieser Angaben unverzüglich in Textform mit, weil Arbeitszeiten bei mehreren Arbeitgebern zusammengerechnet werden.`,
         `(4) Diese Erklärung ersetzt nicht die eigene Prüfung des Arbeitgebers.`,
+      ].join("\n");
+    },
+    textEn: (w, k) => {
+      const neben = (w.nebentaetigkeiten ?? "").split("\n").map((s) => s.trim()).filter(Boolean);
+      return [
+        `(1) ${k.vorname} truthfully declares ${w.vorbeschaeftigung === "ja" ? `having been employed by the Employer until ${datumTextEn(w.vorbeschaeftigungEnde)}` : "not having been employed by the Employer in recent years, including as a temporary worker, working student or in a mini-job"}.`,
+        `(2) Current secondary employment: ${neben.length ? neben.map(frei).join("; ") : "none"}${zahl(w.nebenStunden) ? ` totalling ${w.nebenStunden} hours per week` : ""}.`,
+        `(3) ${k.vorname} reports any changes to this information in text form without undue delay, because working hours with several employers are added together.`,
+        `(4) This declaration does not replace the Employer's own review.`,
       ].join("\n");
     },
     normen: ["§ 14 Abs. 2 TzBfG", "§ 2 Abs. 1 ArbZG"],

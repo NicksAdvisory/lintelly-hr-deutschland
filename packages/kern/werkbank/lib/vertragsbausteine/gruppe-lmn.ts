@@ -6,7 +6,8 @@
 import { WERTE, monateText, monateTextDativ } from "@/lib/regeln/werte";
 import { compare, formatDE, isISODate } from "@/lib/regeln/datum";
 import type { Baustein, Feld, Lage, Werte } from "./typen";
-import { OHNE_WS } from "./typen";
+import { ARBEITNEHMER, OHNE_WS } from "./typen";
+import { anzahlEn, datumEn, euroEn, frei, zahlEn } from "@/lib/dokumente/englisch";
 import { anteil, euro, hat, leer, liste, minderjaehrig, num, regel, wenn, wert, zahl, zahlText } from "./hilfen";
 
 // kein-recht: Kalenderrechnung, ein Monat zählt für das Tagesentgelt mit dreißig Tagen
@@ -47,6 +48,23 @@ const STAFFEL_MONATLICH = "monatlich anteilig";
 const ausnahmenText = (vorname: string) =>
   `Eine Rückzahlung entfällt in jedem Fall, wenn das Arbeitsverhältnis endet durch eine Kündigung des Arbeitgebers aus betriebs- oder personenbedingten Gründen, durch eine Kündigung von ${vorname} aus Gründen, die in der Sphäre des Arbeitgebers liegen, wegen dauerhafter, unverschuldeter Arbeitsunfähigkeit oder Erwerbsminderung oder mit dem Eintritt in den Ruhestand. Während Mutterschutz und Elternzeit ruht die Bindung; sie verlängert sich um diese Zeit, eine Rückzahlung wird in dieser Zeit nicht fällig.`;
 
+const monateEn = (n: number) => anzahlEn(n, "month", "months");
+
+const ausnahmenTextEn = (vorname: string) =>
+  `There is no repayment in any case if the employment relationship ends through dismissal by the Employer for operational or personal reasons, through resignation by ${vorname} for reasons within the Employer's sphere, because of permanent incapacity for work through no fault of the Employee or reduced earning capacity, or upon retirement. During maternity protection and parental leave the commitment period is suspended; it is extended by that time, and no repayment falls due during that time.`;
+
+const KOSTENARTEN_EN: Record<string, string> = {
+  "Lehrgangs- und Prüfungsgebühren": "course and examination fees",
+  Reisekosten: "travel costs",
+  Unterkunft: "accommodation",
+  Lernmaterial: "learning materials",
+};
+const GRUENDE_EN: Record<string, string> = {
+  "Eigenkündigung der Person": "resignation by the Employee",
+  "verhaltensbedingte Kündigung durch den Arbeitgeber": "dismissal by the Employer for reasons of conduct",
+  "Abbruch der Maßnahme durch die Person": "discontinuation of the measure by the Employee",
+};
+
 /** Felder für L2 und L3 (Fortbildungs- und Studienvereinbarung je Maßnahme). */
 const fortbildungFelder = (dauerLabel: string): Feld[] => [
   { id: "titel", label: "Maßnahme (Titel)", typ: "text", pflicht: true },
@@ -64,6 +82,25 @@ const fortbildungFelder = (dauerLabel: string): Feld[] => [
   { id: "vereinbartAm", label: "Vereinbart am (Textform)", typ: "datum", pflicht: true, hinweis: "Die Vereinbarung muss vor Beginn der Maßnahme in Textform vorliegen." },
   { id: "beginn", label: "Beginn der Maßnahme", typ: "datum", pflicht: true },
 ];
+
+function fortbildungTextEn(w: Werte, vorname: string, zusatz: string[]): string {
+  const kosten = zahl(w.kosten);
+  const arten = liste(w.kostenarten).filter((x) => x !== KOSTEN_GEHALT).map((x) => KOSTENARTEN_EN[x] ?? frei(x));
+  const bindung = zahl(w.bindungMonate) ?? 0;
+  const gruende = liste(w.gruende).map((x) => GRUENDE_EN[x] ?? frei(x));
+  const raten = zahl(w.raten);
+  const faellig = w.faelligkeit === "in Monatsraten" ? `in ${raten ? `${zahlEn(raten)} equal` : "equal"} monthly instalments, starting with the month after the end of the employment relationship` : "upon the end of the employment relationship";
+  const beginn = isISODate(w.beginn) ? datumEn(w.beginn) : "[start date]";
+  const vereinbart = isISODate(w.vereinbartAm) ? datumEn(w.vereinbartAm) : "[date]";
+  return [
+    `(1) ${vorname} takes part in the training measure “${frei(w.titel) || "[title]"}” provided by ${w.anbieter?.trim() || "[provider]"}. It begins on ${beginn}. This agreement was concluded in text form on ${vereinbart}, before the measure began.`,
+    `(2) The Employer bears the costs of ${arten.length ? arten.join(", ") : "the measure"} up to a maximum of ${kosten !== null ? euroEn(kosten) : "[amount]"}. ${w.freistellung === "nein" ? "No release from work has been agreed." : `${vorname} is released from work with continued pay to take part.`} Pay during the release from work is never part of a repayment.`,
+    ...zusatz,
+    `(3) If the employment relationship ends within ${monateEn(bindung)} after the end of the measure${gruende.length ? ` through ${gruende.join(" or ")}` : ""}, ${vorname} repays the costs actually incurred under paragraph 2 on a pro rata basis. The repayment amount is reduced by 1/${zahlEn(bindung || 1)} for each full month of employment after the end of the measure.`,
+    `(4) ${ausnahmenTextEn(vorname)}`,
+    `(5) The repayment amount is due ${faellig}.`,
+  ].join("\n");
+}
 
 function fortbildungText(w: Werte, vorname: string, zusatz: string[]): string {
   const kosten = zahl(w.kosten);
@@ -104,6 +141,17 @@ const L1: Baustein = {
       "Eine Pflicht zur Rückzahlung von Fortbildungskosten entsteht nur durch eine eigene Vereinbarung je Maßnahme.",
     ].filter(Boolean).join("\n");
   },
+  labelEn: "Training and release from work",
+  textEn: (w, k) => {
+    const budget = zahl(w.budget);
+    const tage = zahl(w.tage);
+    return [
+      `(1) ${k.vorname} may undertake professional training ${w.genehmigung === "nach Genehmigung durch den Arbeitgeber" ? "subject to approval by the Employer" : "in consultation with their line manager"}.${budget ? ` Up to ${euroEn(budget)} per calendar year is available for this.` : ""}${tage ? ` ${k.vorname} is released from work with continued pay on up to ${zahlEn(tage)} working days per calendar year to take part.` : ""}`,
+      "(2) Training that the Employer must offer under a statute, a regulation, a collective agreement or a works agreement is free of charge for the Employee and takes place during working time; where this is not possible, the time counts as working time (§ 111 GewO).",
+      ja(w.nachweis) ? `(3) ${k.vorname} provides proof of attendance after taking part.` : "",
+      "An obligation to repay training costs arises only from a separate agreement for each measure.",
+    ].filter(Boolean).join("\n");
+  },
   normen: ["§ 111 GewO", "§ 2 Abs. 1 Satz 2 Nr. 12 NachwG"],
   quellen: ["https://www.gesetze-im-internet.de/gewo/__111.html", "https://www.gesetze-im-internet.de/nachwg/__2.html", "Katalog Abschnitt 4, Baustein L1"],
   schutz: ["Pflichtfortbildung ist immer kostenfrei und in der Arbeitszeit."],
@@ -117,6 +165,8 @@ const L2: Baustein = {
   fuer: OHNE_WS,
   felder: fortbildungFelder("Dauer der Maßnahme in Monaten"),
   text: (w, k) => fortbildungText(w, k.vorname, []),
+  labelEn: "Repayment of training costs",
+  textEn: (w, k) => fortbildungTextEn(w, k.vorname, []),
   normen: ["§ 307 BGB", "Art. 12 GG", "§ 111 GewO", "§ 12 BBiG"],
   quellen: ["https://www.gesetze-im-internet.de/bgb/__307.html", "https://www.gesetze-im-internet.de/gewo/__111.html", "https://www.gesetze-im-internet.de/bbig_2005/__12.html", "Katalog Abschnitt 4, Baustein L2"],
   urteile: [{ az: "BAG 3 AZR 900/07", kennung: "P" }, { az: "BAG 9 AZR 260/21", kennung: "V" }],
@@ -205,6 +255,16 @@ const L3: Baustein = {
     ].filter(Boolean);
     return fortbildungText(w, k.vorname, zusatz.length ? [zusatz.join(" ")] : []);
   },
+  labelEn: "Study funding and part-time degree",
+  textEn: (w, k) => {
+    const tage = zahl(w.studientage);
+    const zusatz = [
+      tage ? `${k.vorname} is released from work with pay on up to ${zahlEn(tage)} working days per semester for attendance periods.` : "",
+      ja(w.pruefungstage) ? `${k.vorname} is released from work with pay on the day of each examination.` : "",
+      ja(w.erfolg) ? "The funding is paid after successful completion." : "",
+    ].filter(Boolean);
+    return fortbildungTextEn(w, k.vorname, zusatz.length ? [zusatz.join(" ")] : []);
+  },
   normen: ["§ 307 BGB", "Art. 12 GG", "§ 111 GewO"],
   quellen: ["https://www.gesetze-im-internet.de/bgb/__307.html", "Katalog Abschnitt 4, Baustein L3"],
   urteile: [{ az: "BAG 3 AZR 900/07", kennung: "P" }, { az: "BAG 9 AZR 260/21", kennung: "V" }],
@@ -229,6 +289,17 @@ const L4: Baustein = {
       `(2) Endet das Arbeitsverhältnis innerhalb von ${monateTextDativ(b)} nach dem Umzug durch Eigenkündigung von ${k.vorname} oder durch eine verhaltensbedingte Kündigung des Arbeitgebers, zahlt ${k.vorname} die Erstattung anteilig zurück. Der Betrag mindert sich für jeden vollen Monat der Beschäftigung nach dem Umzug um 1/${zahlText(b || 1)}.`,
       `(3) ${ausnahmenText(k.vorname)}`,
       "(4) Die steuerliche Behandlung der Erstattung richtet sich nach dem Gesetz.",
+    ].join("\n");
+  },
+  labelEn: "Repayment of relocation costs",
+  textEn: (w, k) => {
+    const b = zahl(w.bindungMonate) ?? 0;
+    const kosten = zahl(w.kosten);
+    return [
+      `(1) The Employer reimburses ${k.vorname} for the costs of moving to the place of work up to a maximum of ${kosten !== null ? euroEn(kosten) : "[amount]"}.`,
+      `(2) If the employment relationship ends within ${monateEn(b)} after the move through resignation by ${k.vorname} or through dismissal by the Employer for reasons of conduct, ${k.vorname} repays the reimbursement on a pro rata basis. The amount is reduced by 1/${zahlEn(b || 1)} for each full month of employment after the move.`,
+      `(3) ${ausnahmenTextEn(k.vorname)}`,
+      "(4) The tax treatment of the reimbursement is governed by law.",
     ].join("\n");
   },
   normen: ["§ 307 BGB"],
@@ -262,6 +333,17 @@ const L5: Baustein = {
       `(1) ${k.vorname} erhält eine Einstiegsprämie von ${betrag !== null ? euro(betrag) : "[Betrag]"} brutto, ${w.auszahlung === "in Raten" ? `ausgezahlt in ${raten ? zahlText(raten) : "[Anzahl]"} gleichen Raten mit den ersten Gehältern` : "ausgezahlt mit dem ersten Gehalt"}.`,
       `(2) Endet das Arbeitsverhältnis innerhalb von ${monateTextDativ(b)} nach Beginn durch Eigenkündigung von ${k.vorname} oder durch eine verhaltensbedingte Kündigung des Arbeitgebers, zahlt ${k.vorname} die ausgezahlte Prämie anteilig zurück. Der Betrag mindert sich für jeden vollen Monat der Beschäftigung um 1/${zahlText(b || 1)}.`,
       `(3) ${ausnahmenText(k.vorname)}`,
+    ].join("\n");
+  },
+  labelEn: "Signing bonus with repayment",
+  textEn: (w, k) => {
+    const b = zahl(w.bindungMonate) ?? 0;
+    const betrag = zahl(w.betrag);
+    const raten = zahl(w.raten);
+    return [
+      `(1) ${k.vorname} receives a signing bonus of ${betrag !== null ? euroEn(betrag) : "[amount]"} gross, ${w.auszahlung === "in Raten" ? `paid in ${raten ? zahlEn(raten) : "[number]"} equal instalments with the first salary payments` : "paid with the first salary"}.`,
+      `(2) If the employment relationship ends within ${monateEn(b)} after it begins through resignation by ${k.vorname} or through dismissal by the Employer for reasons of conduct, ${k.vorname} repays the bonus paid out on a pro rata basis. The amount is reduced by 1/${zahlEn(b || 1)} for each full month of employment.`,
+      `(3) ${ausnahmenTextEn(k.vorname)}`,
     ].join("\n");
   },
   normen: ["§ 307 BGB"],
@@ -299,6 +381,20 @@ function karenzText(w: Werte, vorname: string, gehalt: number): string[] {
   ];
 }
 
+function karenzTextEn(w: Werte, vorname: string, gehalt: number): string[] {
+  const k = karenz(gehalt, w);
+  const p = k.a !== null ? zahlEn(k.a * 100) : "[percentage]";
+  const beispiel = k.betrag !== null ? ` Based on current remuneration of ${euroEn(k.basis)} per month, this amounts to ${euroEn(k.betrag)} per month.` : "";
+  const zehntel = zahlEn(WERTE.karenzAnrechnung.zehntel * 100);
+  const viertel = zahlEn(WERTE.karenzAnrechnung.viertelBeiUmzug * 100);
+  const zahlung = w.auszahlung === ZAHLUNG_MONATLICH || !w.auszahlung ? "monthly at the end of each month" : w.auszahlung === "vierteljährlich" ? "quarterly" : "in a single sum";
+  return [
+    `For each year of the restriction, the Employer pays ${vorname} compensation (Karenzentschädigung) of ${p} per cent of the contractual remuneration last received. This includes the fixed salary, the average variable remuneration and benefits in kind.${beispiel} The compensation is paid ${zahlung}.`,
+    `The compensation is firmly promised. It does not depend on any condition or on any choice by the Employer.`,
+    `Anything ${vorname} earns during the restriction from other use of their working capacity, or maliciously fails to earn, is set off against the compensation, insofar as compensation and earnings together exceed the remuneration last received by more than ${zehntel} per cent; if ${vorname} has to move residence because of the restriction, a limit of ${viertel} per cent applies (§ 74c HGB). ${vorname} provides information about such earnings on request.`,
+  ];
+}
+
 const N1_FORTBILDUNG = "Ausscheiden während einer Fortbildungsbindung";
 
 /** Gemeinsame Prüfung der Karenz für M2 und M3. */
@@ -307,12 +403,14 @@ const karenzFehlt = (l: Lage, id: string) => {
   return k.a === null || k.a < WERTE.karenzMindestAnteil.wert;
 };
 
+const UMFANG_STANDARD = "jede Tätigkeit für ein Unternehmen, das mit dem Arbeitgeber im Wettbewerb steht";
+
 const M1: Baustein = {
   id: "M1", gruppe: "M", label: "Wettbewerbsverbot während des Arbeitsverhältnisses", risiko: "grün", version: 1,
   passt: "Für alle Beschäftigten; das Verbot gilt ohnehin kraft Gesetzes und wird hier klar beschrieben.",
-  fuer: OHNE_WS,
+  fuer: ARBEITNEHMER, // Entscheidung 24: auch für Werkstudierende
   felder: [
-    { id: "umfang", label: "Umfang", typ: "lang", standard: "jede Tätigkeit für ein Unternehmen, das mit dem Arbeitgeber im Wettbewerb steht" },
+    { id: "umfang", label: "Umfang", typ: "lang", standard: UMFANG_STANDARD },
     { id: "beteiligung", label: "Beteiligungen an Wettbewerbern anzeigen", typ: "janein", standard: "ja" },
     { id: "beteiligungGrenze", label: "Anzeige ab Anteil in Prozent", typ: "prozent", min: 0, max: 100, bei: { beteiligung: ["ja"] }, hinweis: "Beispielwert, frei wählbar. Reine Geldanlage in börsennotierte Anteile darunter bleibt frei." },
     { id: "ausnahmen", label: "Ausnahmen", typ: "lang" },
@@ -324,6 +422,17 @@ const M1: Baustein = {
       ja(w.beteiligung) ? `(2) ${k.vorname} zeigt Beteiligungen an Wettbewerbern in Textform an${g ? `, sobald der Anteil ${zahlText(g)} Prozent erreicht` : ""}.` : "",
       w.ausnahmen?.trim() ? `(3) Ausgenommen ist: ${w.ausnahmen.trim()}` : "",
       "Das Verbot endet mit dem Ende des Arbeitsverhältnisses. Ein Verbot für die Zeit danach gilt nur mit einer eigenen Vereinbarung mit Karenzentschädigung.",
+    ].filter(Boolean).join("\n");
+  },
+  labelEn: "Non-competition during employment",
+  textEn: (w, k) => {
+    const g = zahl(w.beteiligungGrenze);
+    const umfang = w.umfang?.trim();
+    return [
+      `(1) During the employment relationship, ${k.vorname} refrains from ${!umfang || umfang === UMFANG_STANDARD ? "any activity for a business that competes with the Employer" : frei(umfang)}.`,
+      ja(w.beteiligung) ? `(2) ${k.vorname} notifies the Employer in text form of any shareholdings in competitors${g ? `, as soon as the share reaches ${zahlEn(g)} per cent` : ""}.` : "",
+      w.ausnahmen?.trim() ? `(3) The following is excluded: ${frei(w.ausnahmen)}` : "",
+      "The restriction ends when the employment relationship ends. A restriction for the period afterwards applies only under a separate agreement with compensation (Karenzentschädigung).",
     ].filter(Boolean).join("\n");
   },
   normen: ["§ 60 HGB", "§ 241 Abs. 2 BGB"],
@@ -356,6 +465,20 @@ const M2: Baustein = {
       ja(w.verzicht) || !w.verzicht ? `(4) Der Arbeitgeber kann vor dem Ende des Arbeitsverhältnisses durch Erklärung in Schriftform auf das Verbot verzichten. Er wird dann mit Ablauf von ${monateTextDativ(WERTE.karenzVerzichtMonate.wert)} seit der Erklärung von der Pflicht zur Entschädigung frei (§ 75a HGB).` : "(4) Ein Verzicht des Arbeitgebers richtet sich nach § 75a HGB.",
       "(5) Das Verbot wird unverbindlich, wenn die Voraussetzungen des § 75 HGB vorliegen, insbesondere bei einer Kündigung durch die Person wegen vertragswidrigen Verhaltens des Arbeitgebers.",
       `(6) Die Vereinbarung bedarf der Schriftform. Der Arbeitgeber händigt ${k.vorname} eine von ihm unterschriebene Urkunde mit diesen Bestimmungen aus (§ 74 Abs. 1 HGB). ${strafe}`.trim(),
+    ].join("\n");
+  },
+  labelEn: "Post-contractual non-competition covenant",
+  textEn: (w, k) => {
+    const d = zahl(w.dauerMonate) ?? 0;
+    const karenzSaetze = karenzTextEn(w, k.vorname, k.gehalt);
+    const strafe = "N2" in k.auswahl ? "The agreed contractual penalty for breach of the non-competition covenant applies to any breach." : "";
+    return [
+      `(1) For ${monateEn(d)} after the end of the employment relationship, ${k.vorname} will not work for a business that competes with the Employer in the following field, whether as an employee, as a self-employed person or through a substantial shareholding. Scope: ${frei(w.gegenstand) || "[scope]"}. Territory: ${frei(w.gebiet) || "[territory]"}.`,
+      `(2) The restriction protects the following legitimate business interest of the Employer: ${frei(w.interesse) || "[interest]"}`,
+      `(3) ${karenzSaetze.join(" ")}`,
+      ja(w.verzicht) || !w.verzicht ? `(4) Before the employment relationship ends, the Employer may waive the restriction by declaration in written form. The Employer is then released from the obligation to pay compensation on expiry of ${monateEn(WERTE.karenzVerzichtMonate.wert)} from the declaration (§ 75a HGB).` : "(4) A waiver by the Employer is governed by § 75a HGB.",
+      "(5) The restriction becomes non-binding where the conditions of § 75 HGB are met, in particular where the Employee resigns because of a breach of contract by the Employer.",
+      `(6) The agreement must be in written form. The Employer hands ${k.vorname} a document signed by the Employer containing these provisions (§ 74 para. 1 HGB). ${strafe}`.trim(),
     ].join("\n");
   },
   normen: ["§ 74 HGB", "§ 74a HGB", "§ 74b HGB", "§ 74c HGB", "§ 75 HGB", "§ 75a HGB", "§ 110 GewO"],
@@ -449,6 +572,17 @@ const M3: Baustein = {
       `(3) Die Vereinbarung bedarf der Schriftform. Der Arbeitgeber händigt ${k.vorname} eine von ihm unterschriebene Urkunde aus (§ 74 Abs. 1 HGB).`,
     ].join("\n");
   },
+  labelEn: "Customer protection clause",
+  textEn: (w, k) => {
+    const d = zahl(w.dauerMonate) ?? 0;
+    const r = zahl(w.rueckblickMonate) ?? WERTE.vertragStandards.kundenschutzRueckblickMonate;
+    const kreis = w.kunden === "Kundenliste als Anlage" ? "the customers listed in the annex to this contract" : `the customers whom ${k.vorname} looked after in the last ${monateEn(r)} before the end of the employment relationship`;
+    return [
+      `(1) For ${monateEn(d)} after the end of the employment relationship, ${k.vorname} will not work for ${kreis}, whether as an employee or as a self-employed person.`,
+      `(2) ${karenzTextEn(w, k.vorname, k.gehalt).join(" ")}`,
+      `(3) The agreement must be in written form. The Employer hands ${k.vorname} a document signed by the Employer (§ 74 para. 1 HGB).`,
+    ].join("\n");
+  },
   normen: ["§ 74 HGB", "§ 74a HGB", "§ 74c HGB", "§ 110 GewO"],
   quellen: ["https://www.gesetze-im-internet.de/hgb/__74.html", "https://www.gesetze-im-internet.de/hgb/__74a.html", "Katalog Abschnitt 4, Baustein M3"],
   urteile: [{ az: "BAG Linie zur Kundenschutzklausel als Wettbewerbsverbot", kennung: "P" }],
@@ -475,6 +609,16 @@ const M4: Baustein = {
       ja(w.karenz) ? `(3) Der Arbeitgeber zahlt für die Dauer des Verbots eine Entschädigung von ${e !== null ? euro(e) : "[Betrag]"} im Monat.` : "",
     ].filter(Boolean).join("\n");
   },
+  labelEn: "Non-solicitation of employees",
+  textEn: (w, k) => {
+    const d = zahl(w.dauerMonate) ?? 0;
+    const e = zahl(w.entschaedigung);
+    return [
+      `(1) For ${monateEn(d)} after the end of the employment relationship, ${k.vorname} will not actively solicit employees of the Employer, whether for themselves or for third parties.`,
+      "(2) This does not cover cases where employees enquire on their own initiative or respond to a general job advertisement. There is no prohibition on hiring such persons.",
+      ja(w.karenz) ? `(3) For the duration of the restriction, the Employer pays compensation of ${e !== null ? euroEn(e) : "[amount]"} per month.` : "",
+    ].filter(Boolean).join("\n");
+  },
   normen: ["§ 74 HGB", "§ 75f HGB", "§ 307 BGB"],
   quellen: ["https://www.gesetze-im-internet.de/hgb/__75f.html", "Katalog Abschnitt 4, Baustein M4"],
   urteile: [{ az: "Linie zur Abwerbung als Wettbewerbsbeschränkung", kennung: "P" }],
@@ -484,6 +628,12 @@ const M4: Baustein = {
 };
 
 /* ---------- N: Vertragsstrafe ---------- */
+
+const N1_VERSTOESSE_EN: Record<string, string> = {
+  "Nichtantritt der Stelle": "fails to take up the position",
+  "Beendigung ohne Einhaltung der Kündigungsfrist": "ends the employment relationship without observing the notice period",
+  [N1_FORTBILDUNG]: "leaves in breach of contract during a training commitment period",
+};
 
 const N1: Baustein = {
   id: "N1", gruppe: "N", label: "Vertragsstrafe bei Vertragsbruch", risiko: "gelb", version: 1,
@@ -505,6 +655,18 @@ const N1: Baustein = {
       `(1) ${k.vorname} zahlt eine Vertragsstrafe, wenn ${k.vorname} schuldhaft ${v.length ? v.join(" oder ").replace("Nichtantritt der Stelle", "die Stelle nicht antritt").replace("Beendigung ohne Einhaltung der Kündigungsfrist", "das Arbeitsverhältnis ohne Einhaltung der Kündigungsfrist beendet").replace(N1_FORTBILDUNG, "während einer Fortbildungsbindung vertragswidrig ausscheidet") : "[Verstoßfall]"}.`,
       `(2) Die Strafe beträgt je Fall ${betrag !== null ? euro(betrag) : "[Betrag]"}${probe !== null ? `, beim Nichtantritt und in der Probezeit ${euro(probe)}` : ""}. Sie ist höchstens so hoch wie das Entgelt, das bis zum Ablauf der jeweils geltenden Kündigungsfrist zu zahlen wäre.${ober !== null ? ` Alle Strafen zusammen betragen höchstens ${euro(ober)}.` : ""}`,
       "(3) Die Strafe wird auf einen weitergehenden Schadensersatz angerechnet. Eine Kündigung unter Einhaltung der Frist löst keine Strafe aus.",
+    ].join("\n");
+  },
+  labelEn: "Contractual penalty for breach of contract",
+  textEn: (w, k) => {
+    const v = liste(w.verstoesse).map((x) => N1_VERSTOESSE_EN[x] ?? frei(x));
+    const betrag = zahl(w.betrag);
+    const probe = zahl(w.betragProbezeit);
+    const ober = zahl(w.obergrenze);
+    return [
+      `(1) ${k.vorname} pays a contractual penalty if ${k.vorname} culpably ${v.length ? v.join(" or ") : "[breach]"}.`,
+      `(2) The penalty is ${betrag !== null ? euroEn(betrag) : "[amount]"} per case${probe !== null ? `, or ${euroEn(probe)} for failure to take up the position and during the probationary period` : ""}. It is no higher than the pay that would be due until the end of the applicable notice period.${ober !== null ? ` All penalties together amount to no more than ${euroEn(ober)}.` : ""}`,
+      "(3) The penalty is credited against any further claim for damages. Resignation with due notice does not trigger a penalty.",
     ].join("\n");
   },
   normen: ["§ 339 BGB", "§ 340 BGB", "§ 343 BGB", "§ 307 BGB", "§ 12 BBiG"],
@@ -548,6 +710,13 @@ const N1: Baustein = {
   ],
 };
 
+const N2_VERSTOESSE_EN: Record<string, string> = {
+  "Verrat von Geschäftsgeheimnissen": "disclosure of trade secrets",
+  "Verstoß gegen das nachvertragliche Wettbewerbsverbot": "breach of the post-contractual non-competition covenant",
+  "Verstoß gegen die Kundenschutzklausel": "breach of the customer protection clause",
+  "Verstoß gegen das Abwerbeverbot": "breach of the non-solicitation clause",
+};
+
 const N2: Baustein = {
   id: "N2", gruppe: "N", label: "Vertragsstrafe bei Geheimnisverrat und Wettbewerbsverstoß", risiko: "gelb", version: 1,
   passt: "In Verbindung mit nachvertraglicher Verschwiegenheit (H2) und Wettbewerbsverbot (M2).",
@@ -566,6 +735,16 @@ const N2: Baustein = {
       `(1) Verstößt ${k.vorname} schuldhaft gegen eine der folgenden Pflichten, zahlt ${k.vorname} eine Vertragsstrafe: ${liste(w.verstoesse).join(", ") || "[Verstoß]"}.`,
       `(2) Die Strafe beträgt bei einem leichten Verstoß ${b(w.leicht)}, bei einem mittleren Verstoß ${b(w.mittel)} und bei einem schweren Verstoß ${b(w.schwer)}.${zahl(w.dauerMonat) !== null ? ` Bei einem Dauerverstoß fällt die Strafe für jeden angefangenen Monat des Verstoßes einmal an, je Monat ${b(w.dauerMonat)}.` : ""} Alle Strafen zusammen betragen höchstens ${b(w.obergrenze)}.`,
       "(3) Die Strafe wird auf einen weitergehenden Schadensersatz angerechnet. Die Höhe steht fest und wird nicht nach Ermessen des Arbeitgebers bestimmt.",
+    ].join("\n");
+  },
+  labelEn: "Contractual penalty for disclosure of secrets and breach of non-competition",
+  textEn: (w, k) => {
+    const b = (s: string | undefined) => (zahl(s) !== null ? euroEn(zahl(s)!) : "[amount]");
+    const v = liste(w.verstoesse).map((x) => N2_VERSTOESSE_EN[x] ?? frei(x));
+    return [
+      `(1) If ${k.vorname} culpably breaches one of the following obligations, ${k.vorname} pays a contractual penalty: ${v.join(", ") || "[breach]"}.`,
+      `(2) The penalty is ${b(w.leicht)} for a minor breach, ${b(w.mittel)} for a moderate breach and ${b(w.schwer)} for a serious breach.${zahl(w.dauerMonat) !== null ? ` In the case of a continuing breach, the penalty is incurred once for each month or part of a month of the breach, at ${b(w.dauerMonat)} per month.` : ""} All penalties together amount to no more than ${b(w.obergrenze)}.`,
+      "(3) The penalty is credited against any further claim for damages. The amount is fixed and is not determined at the Employer's discretion.",
     ].join("\n");
   },
   normen: ["§ 75c HGB", "§ 307 BGB", "§ 343 BGB", "GeschGehG"],

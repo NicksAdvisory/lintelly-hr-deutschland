@@ -108,6 +108,15 @@ export function tageGewichtet(von: ISODate, bis: ISODate, tage1: number, ab: ISO
   return gewicht ? r6(summe / gewicht) : tage1;
 }
 
+/** Fehlermeldung zum Datum des Wechsels, wenn es nicht im Beschäftigungszeitraum des Jahres liegt, sonst undefined. */
+export function pruefeWechsel(ab: ISODate, jahr: number, eintritt: ISODate | null, austritt: ISODate | null): string | undefined {
+  if (parts(ab).y !== jahr) return `Der Wechsel muss im Urlaubsjahr ${jahr} liegen.`;
+  if (eintritt && compare(ab, eintritt) <= 0) return `Der Wechsel muss nach dem Eintritt am ${formatDE(eintritt)} liegen.`;
+  if (austritt && compare(ab, austritt) > 0) return `Der Wechsel muss vor dem Austritt am ${formatDE(austritt)} liegen.`;
+  if (compare(ab, iso(jahr, 1, 1)) === 0) return "Ein Wechsel zum 01.01. gilt fürs ganze Jahr. Trag die neuen Arbeitstage dann oben im Wochenplan ein.";
+  return undefined;
+}
+
 export function berechneUrlaub(e: UrlaubEingabe): UrlaubErgebnis {
   const rechenweg: string[] = [];
   const hinweise: UrlaubErgebnis["hinweise"] = [];

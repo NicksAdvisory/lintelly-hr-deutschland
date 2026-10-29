@@ -225,6 +225,17 @@ export function zeitraumEnde(beginn: ISODate, monate: number): ISODate {
   return addDays(iso(ziel.y, ziel.m, p.d), -1);
 }
 
+/**
+ * Letzter Tag einer Rückwärtsfrist "spätestens n Monate oder Wochen vor Beginn" (§ 8 Abs. 2 und 5 TzBfG, auch mit § 9a Abs. 3,
+ * § 2a Abs. 1 FPfZG, § 16 Abs. 1 BEEG, § 5 Abs. 1 HBUG). §§ 187 Abs. 1, 188 Abs. 2 BGB rückwärts gelesen: der Tag des Beginns zählt
+ * nicht mit, vor ihm müssen die vollen n Monate oder Wochen liegen. Erklärung oder Antwort muss also am Tag vor dem gleich benannten Tag
+ * zugehen, Beginn 01.07. und drei Monate: bis 31.03. Die Fiktion nach Schweigen gilt ab dem Tag danach. Vorsichtige Lesart, damit eine
+ * Ablehnung nie zu spät kommt. Kanzlei bestätigen.
+ */
+export function spaetestensVor(beginn: ISODate, n: { monate: number } | { wochen: number }): ISODate {
+  return addDays("monate" in n ? addMonths(beginn, -n.monate) : addDays(beginn, -n.wochen * 7), -1);
+}
+
 /** Letzter Tag der Probezeit. Gesetzlich zählt für § 622 Abs. 3 BGB höchstens 6 Monate. */
 export function probezeitEnde(eintritt: ISODate, monate: number): ISODate {
   return zeitraumEnde(eintritt, monate);

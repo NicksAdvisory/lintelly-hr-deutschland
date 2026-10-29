@@ -148,6 +148,8 @@ export const ROLLE_TEXT: Record<Rolle, string> = { hr: "HR-Leitung", fuehrung: "
  * Meldung als arbeitsuchend (§ 38 Abs. 1 SGB III): spätestens drei Monate vor dem Ende; erfährt die Person weniger als drei Monate
  * vorher davon, innerhalb von drei Tagen nach Kenntnis. Ohne Kenntnisdatum (Befristung, von Anfang an bekannt) gilt drei Monate vor dem Ende.
  * Nie vor der Kenntnis: am Monatsende kappt die Monatsrechnung (Zugang 31.03., Ende 30.06. ergäbe 30.03.), dann gelten die drei Tage (Prüffund T-2).
+ * Nicht spaetestensVor (Review 23.10.2026, B1): Bezug ist das Ende des letzten Tags, nicht ein Beginn. Drei Monate vor dem letzten Tag sind
+ * nach §§ 187, 188 BGB rückwärts derselbe Tag oder, am Monatsende, einen Tag früher, nie später.
  */
 export function arbeitsuchendFrist(letzterTag: ISODate, kenntnis: ISODate | null): ISODate {
   const m = WERTE.arbeitsuchendMeldung;

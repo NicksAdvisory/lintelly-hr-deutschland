@@ -133,9 +133,11 @@ describe("aufbewahrungsfristen", () => {
     expect(a.quellen[0]).toMatchObject({ url: "https://www.gesetze-im-internet.de/ao_1977/__147.html" });
     expect(merken(a)).toBe("Frist merken: Werkzeug frist_merken (Ende der Aufbewahrungsfrist, 2034-12-31)");
   });
-  it("SV-Unterlage im geprüften Zeitraum bis Ende des Jahres nach der Prüfung, danach nicht löschbar", () => {
+  it("SV-Unterlage im geprüften Zeitraum: verbindlich ist die längere steuerliche Frist, die SV-Frist steht im Rechenweg", () => {
     const pruefung = { pruefung_zeitraum_bis: "2023-12-31", pruefung_am: "2024-05-10" };
-    expect(rufe("aufbewahrungsfristen", { dokument: "sv", datum: "2023-01-31", ...pruefung }).ergebnis).toMatchObject({ aufbewahren_bis: "2025-12-31", loeschen_ab: "2026-01-01", jetzt_loeschen: false });
+    const a = rufe("aufbewahrungsfristen", { dokument: "sv", datum: "2023-01-31", ...pruefung });
+    expect(a.ergebnis).toMatchObject({ aufbewahren_bis: "2031-12-31", loeschen_ab: "2032-01-01", jetzt_loeschen: false });
+    expect(a.rechenweg!.join(" ")).toMatch(/§ 28f SGB IV allein: aufbewahren bis 31\.12\.2025/);
     expect(rufe("aufbewahrungsfristen", { dokument: "sv", datum: "2026-03-31", ...pruefung }).ergebnis).toMatchObject({ aufbewahren_bis: null, loeschen_ab: null });
   });
   it("Bewerbung 6 Monate ab 31.08. ergibt 28.02.", () => {

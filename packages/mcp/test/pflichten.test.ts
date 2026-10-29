@@ -88,7 +88,7 @@ describe("bem_pflicht", () => {
   });
   it("noch keine Pflicht: Wiedervorlage in einem Monat merken", () => {
     const a = rufe("bem_pflicht", { stichtag: "2026-10-01", zeitraeume: [{ von: "2026-09-01", bis: "2026-09-10" }] });
-    expect(a.ergebnis).toMatchObject({ bem_pflicht: false, fehlen_noch_kalendertage: 33 });
+    expect(a.ergebnis).toMatchObject({ bem_pflicht: false, bis_zur_grenze: "noch 23 Arbeitstage" });
     expect(a.naechster_schritt!.join(" ")).toMatch(/Frist merken: Werkzeug frist_merken.*01\.11\.2026/);
   });
   it("3-Tage-Woche: Grenze nach Arbeitstagen ist 18", () => {

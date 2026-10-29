@@ -37,3 +37,18 @@ export function saeubern(t: string): string {
 export function zeilen(s: string) {
   return s.split("\n").map((l) => l.replace(/^\s*[-•*]\s*/, "").trim()).filter(Boolean);
 }
+
+/** Kurzname eines Tools für Kacheln und Links: der Teil der H1 vor dem Doppelpunkt ("BEM-Rechner: Ab wann …" wird "BEM-Rechner"). */
+export const kurzName = (h1: string) => h1.split(":")[0].trim();
+
+/** Radiogruppe mit Pfeiltasten (ui.tsx, Segmented): neue Position nach Taste, null bei anderen Tasten. Läuft am Ende rundherum. */
+export function rovingIndex(i: number, taste: string, n: number): number | null {
+  if (taste === "ArrowRight" || taste === "ArrowDown") return (i + 1) % n;
+  if (taste === "ArrowLeft" || taste === "ArrowUp") return (i - 1 + n) % n;
+  if (taste === "Home") return 0;
+  if (taste === "End") return n - 1;
+  return null;
+}
+
+/** Kalender-Blatt am Handy (datum-feld.tsx): schließen ab 25 % der Höhe nach unten oder bei schnellem Wischen nach unten (px/ms). */
+export const blattSchliessen = (dy: number, hoehe: number, tempo: number) => dy > hoehe * 0.25 || (dy > 12 && tempo > 0.5);

@@ -2,6 +2,28 @@
 
 Versionen nach SemVer. Jede Version geht über die Release-Pipeline auf npm, ghcr.io und hr.lintelly.com.
 
+## Unveröffentlicht (Zweig mcp-fixes-29-10)
+
+### Kern auf Stand 29.10.2026 (Werkbank main, lintelly.com main)
+
+- `packages/kern` wieder gleich mit den Quellen (`node scripts/abgleich.mjs --pruefen`: 0 Abweichungen). Neu auf der Kopierliste: `lib/dokumente/englisch`, `lib/vertragsbausteine/kanzlei`, `lib/vertragsbausteine/eingabe`, `lib/workflows/bauen`, `components/tools/sensibel` und die Website-Tests `test-ux-fristen`, `test-ux-geld`, `test-ux-pflichten`, `test-ux-trennung`.
+- `lib/fehler.ts` der Werkbank kommt nur als Auszug (`logFehler` auf stderr): Das Original legt `data/logs/fehler.log` an, der MCP schreibt beim Nutzer keine Dateien. Der Grenztest prüft das jetzt auch für `packages/kern`.
+- Rechtswerte-Register mit 217 öffentlichen Werten, 127 Vertragsbausteine.
+- Übernommen aus den Korrekturen von lintelly.com vom 28.10.2026 (stille Fehlergebnisse):
+  - Probezeit: Gespräch und Entscheidung nie vor dem ersten Arbeitstag, Probezeit länger als die Befristung ist ein Fehler, Meldung nennt den erlaubten Bereich.
+  - Sonderkündigungsschutz: Schwerbehinderung unter 6 Monaten ohne Zustimmungsschritte, nur Anhörung und Anzeige.
+  - Abfindung: Faktor 2,0 in der Spanne, Höchstbetrag ohne Alter als Hinweis statt als Tatsache, weiche Hinweise bei über 50 Jahren Zugehörigkeit und Gehalt unter 500 €, „Kein gesetzlicher Anspruch“ als neutraler Hinweis.
+  - Elternzeit: Hinweis, wenn die Antragsfrist schon vorbei ist, mit frühestem Beginn ab heute.
+  - Entgeltfortzahlung: Krankengeld auch für die Wartezeit, „wieder volle 6 Wochen“ mit „seit“ für vergangene Daten, Hinweis bei mehr als 78 Wochen.
+  - Minijob: sagt, ob der Monat oder erst die Einmalzahlung die Grenze reißt.
+  - Ausgleichsabgabe: Besetzung in Worten, Hinweis bei mehr Schwerbehinderten als Arbeitsplätzen.
+  - Aufbewahrung: nur ein Datum der Betriebsprüfung ist ein Fehler, bei Entgeltunterlagen gilt die längere steuerliche Frist, die SV-Frist steht im Rechenweg.
+  - BEM: Abstand zur näheren Grenze („noch 1 Arbeitstag“ statt Kalendertage), Hinweis auf Hochrechnung bei Stichtag in der Zukunft.
+  - Schwellenwerte: Zählbasis zur nächsten Schwelle, wenn sie nicht die Kopfzahl ist.
+  - Pausen: Beginn gleich Ende wird abgelehnt, Tage mit Eingabefehler fallen nicht mehr still weg.
+  - Urlaubsanspruch: Wechsel der Arbeitstage außerhalb des Beschäftigungszeitraums ist ein Fehler.
+  - Stellenanzeige: keine Fehlalarme mehr bei „Kein Foto nötig“, „junge Familien“, „Kinder unter 12 Jahren“.
+
 ## 0.2.2
 
 - Werkzeugbeschreibungen ohne Verweise auf andere Werkzeuge und ohne Anweisungen an das Modell (Richtlinie des Anthropic-Verzeichnisses). Die Reihenfolge steht weiter in den Server-Anweisungen und in den Skills des Plugins.

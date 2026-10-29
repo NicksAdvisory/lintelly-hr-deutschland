@@ -10,22 +10,57 @@ import type { Baustein, Lage } from "./typen";
 import { MIT_AUSBILDUNG, OHNE_WS, ARBEITNEHMER } from "./typen";
 import { euro, hat, liste, num, regel, wenn, wert, zahl } from "./hilfen";
 import { findeGesperrte } from "./rot";
+import { anzahlEn, datumEn, euroEn, frei, zahlwortEn } from "@/lib/dokumente/englisch";
 
 const ja = (s: string | undefined) => (s ?? "").trim().toLowerCase() === "ja";
 const gesperrtIn = (l: Lage, id: string, rot: string) => findeGesperrte(wert(l, id, "ergaenzung")).some((r) => r.id === rot);
+
+/* Englische Hilfen: Auswahlwerte auf feste englische Wörter, unbekannte Werte als freie Eingabe. */
+const monEn = (n: number) => anzahlEn(n, "month", "months");
+const enListe = (s: string | undefined, karte: Record<string, string>) => liste(s).map((x) => karte[x] ?? frei(x));
+const GRUENDE_EN: Record<string, string> = {
+  "nach Ausspruch einer Kündigung": "after notice of termination has been given",
+  "bei Abschluss eines Aufhebungsvertrags": "upon conclusion of a termination agreement",
+  "bei Verdacht auf Tätigkeit für einen Wettbewerber": "where there is suspicion of activity for a competitor",
+  "bei schwerem Vertrauensverlust": "in the event of a serious loss of trust",
+};
+const ZUGRIFF_EN: Record<string, string> = {
+  "im Intranet": "on the intranet",
+  "als Aushändigung in Kopie": "in the copies handed over",
+  "zur Einsicht in der Personalabteilung": "in the HR department",
+};
+const UNTERLAGEN_EN: Record<string, string> = {
+  "Ausfertigung dieses Vertrags": "a signed copy of this contract",
+  "Stellenbeschreibung": "job description",
+  "Richtlinien": "policies",
+  "Datenschutzinformation": "data protection information",
+  "Betriebsvereinbarungen": "works agreements",
+};
+const ANGABEN_EN: Record<string, string> = {
+  "Anschrift": "address",
+  "Bankverbindung": "bank details",
+  "Name": "name",
+  "Staatsangehörigkeit und Aufenthaltstitel": "nationality and residence permit",
+  "Lohnsteuermerkmale": "wage tax data",
+};
 
 /* ---------- O: Abtretung, Pfändung, Aufrechnung ---------- */
 
 const O1: Baustein = {
   id: "O1", gruppe: "O", label: "Abtretungs- und Verpfändungsverbot", risiko: "grün", version: 1,
   passt: "Für alle Arbeitsverhältnisse, um Aufwand mit Abtretungen der Vergütung zu vermeiden.",
-  fuer: OHNE_WS,
+  fuer: ARBEITNEHMER, // Entscheidung 24: auch für Werkstudierende
   felder: [
     { id: "zustimmung", label: "Abtretung mit Zustimmung des Arbeitgebers möglich", typ: "janein", standard: "ja" },
   ],
   text: (w, k) => [
     `(1) ${k.vorname} kann Ansprüche auf Vergütung nicht an Dritte abtreten oder verpfänden${ja(w.zustimmung) ? ", es sei denn, der Arbeitgeber stimmt in Textform zu" : ""}.`,
     "(2) Pfändungen durch Gläubiger und der gesetzliche Pfändungsschutz bleiben davon unberührt.",
+  ].join("\n"),
+  labelEn: "Prohibition of assignment and pledging",
+  textEn: (w, k) => [
+    `(1) ${k.vorname} may not assign or pledge claims to remuneration to third parties${ja(w.zustimmung) ? ", unless the Employer consents in text form" : ""}.`,
+    "(2) Attachments by creditors and the statutory protection against attachment remain unaffected.",
   ].join("\n"),
   normen: ["§ 399 BGB", "§ 850 ZPO"],
   quellen: ["https://www.gesetze-im-internet.de/bgb/__399.html", "https://www.gesetze-im-internet.de/zpo/__850.html", "Katalog Abschnitt 4, Baustein O1"],
@@ -37,13 +72,18 @@ const O1: Baustein = {
 const O2: Baustein = {
   id: "O2", gruppe: "O", label: "Lohnpfändung: Mitwirkung", risiko: "grün", version: 1,
   passt: "Für alle Arbeitsverhältnisse.",
-  fuer: OHNE_WS,
+  fuer: ARBEITNEHMER, // Entscheidung 24: auch für Werkstudierende
   felder: [
     { id: "mitteilung", label: "Person teilt bekannte Pfändungen mit", typ: "janein", standard: "ja" },
   ],
   text: (w, k) => [
     ja(w.mitteilung) ? `(1) ${k.vorname} teilt dem Arbeitgeber in Textform mit, wenn ${k.vorname} von einer Pfändung oder Abtretung der Vergütung erfährt.` : "",
     "(2) Der Arbeitgeber bearbeitet Pfändungen nach den gesetzlichen Vorschriften. Eine pauschale Bearbeitungsgebühr wird nicht erhoben.",
+  ].filter(Boolean).join("\n"),
+  labelEn: "Wage attachment: cooperation",
+  textEn: (w, k) => [
+    ja(w.mitteilung) ? `(1) ${k.vorname} informs the Employer in text form upon learning of an attachment or assignment of the remuneration.` : "",
+    "(2) The Employer processes attachments in accordance with the statutory provisions. No flat-rate processing fee is charged.",
   ].filter(Boolean).join("\n"),
   normen: ["§ 829 ZPO", "§ 850c ZPO"],
   quellen: ["https://www.gesetze-im-internet.de/zpo/__829.html", "https://www.gesetze-im-internet.de/zpo/__850c.html", "Katalog Abschnitt 4, Baustein O2"],
@@ -63,6 +103,11 @@ const O3: Baustein = {
   text: (w, k) => [
     `(1) Der Arbeitgeber kann mit eigenen Forderungen gegen die Vergütung von ${k.vorname} nur aufrechnen, soweit die Vergütung pfändbar ist.`,
     ja(w.vorab) ? `(2) Der Arbeitgeber informiert ${k.vorname} vor der Verrechnung in Textform über Grund und Höhe.` : "",
+  ].filter(Boolean).join("\n"),
+  labelEn: "Set-off and deductions from salary",
+  textEn: (w, k) => [
+    `(1) The Employer may set off its own claims against the remuneration of ${k.vorname} only to the extent that the remuneration is attachable.`,
+    ja(w.vorab) ? `(2) Before any set-off, the Employer informs ${k.vorname} in text form of the reason and the amount.` : "",
   ].filter(Boolean).join("\n"),
   normen: ["§ 394 BGB", "§ 850c ZPO"],
   quellen: ["https://www.gesetze-im-internet.de/bgb/__394.html", "Katalog Abschnitt 4, Baustein O3"],
@@ -88,6 +133,12 @@ const P1: Baustein = {
     ja(w.weiter) ? "(2) Beide Seiten können den Zeitpunkt der Beendigung während des Arbeitsverhältnisses durch Vereinbarung hinausschieben, auch mehrfach (§ 41 Satz 3 SGB VI)." : "",
     "Diese Vereinbarung bedarf der Schriftform.",
   ].filter(Boolean).join("\n"),
+  labelEn: "Termination on reaching the standard retirement age",
+  textEn: (w, k) => [
+    `(1) The employment relationship ends, without the need for notice of termination, at the end of the month in which ${k.vorname} reaches the standard retirement age under the statutory pension insurance.`,
+    ja(w.weiter) ? "(2) During the employment relationship, both parties may agree to postpone the date of termination, also more than once (§ 41 sentence 3 SGB VI)." : "",
+    "This agreement requires written form (Schriftform).",
+  ].filter(Boolean).join("\n"),
   normen: ["§ 41 SGB VI", "§ 14 TzBfG", "AGG"],
   quellen: ["https://www.gesetze-im-internet.de/sgb_6/__41.html", "https://www.gesetze-im-internet.de/tzbfg/__14.html", "Katalog Abschnitt 4, Baustein P1"],
   urteile: [{ az: "Linie BAG zur Altersgrenze bei Regelaltersgrenze", kennung: "P" }],
@@ -97,13 +148,14 @@ const P1: Baustein = {
 };
 
 const P2: Baustein = {
-  id: "P2", gruppe: "P", label: "Freistellung nach Kündigung", risiko: "gelb", version: 1,
+  id: "P2", gruppe: "P", label: "Freistellung nach Kündigung", risiko: "gelb", version: 2,
   passt: "Für Fach- und Führungskräfte, Vertrieb und Positionen mit Zugang zu Geheimnissen.",
-  fuer: OHNE_WS,
+  fuer: ARBEITNEHMER, // Entscheidung 24: auch für Werkstudierende
   felder: [
     { id: "gruende", label: "Gründe", typ: "mehrfach", optionen: ["nach Ausspruch einer Kündigung", "bei Abschluss eines Aufhebungsvertrags", "bei Verdacht auf Tätigkeit für einen Wettbewerber", "bei schwerem Vertrauensverlust"], standard: "nach Ausspruch einer Kündigung", pflicht: true },
     { id: "art", label: "Art der Freistellung", typ: "auswahl", optionen: ["unwiderruflich", "widerruflich"], standard: "unwiderruflich", pflicht: true },
     { id: "urlaub", label: "Resturlaub wird angerechnet", typ: "janein", standard: "ja", bei: { art: ["unwiderruflich"] }, hinweis: "Urlaub lässt sich nur in einer unwiderruflichen Freistellung anrechnen." },
+    { id: "urlaubFolgejahr", label: "Reicht die Freistellung ins nächste Jahr: Urlaub des Folgejahres vorsorglich mit gewähren", typ: "janein", standard: "nein", bei: { art: ["unwiderruflich"] }, hinweis: "Ob die Gewährung vor Entstehen des Anspruchs wirkt, ist nicht abschließend geklärt: Kanzlei prüfen." },
     { id: "ueberstunden", label: "Guthaben aus Überstunden wird angerechnet", typ: "janein", standard: "ja" },
     { id: "verdienst", label: "Anderweitiger Verdienst wird angerechnet", typ: "janein", standard: "ja" },
     { id: "rueckgabe", label: "Rückgabe von Arbeitsmitteln bei Freistellung", typ: "janein", standard: "ja" },
@@ -113,10 +165,24 @@ const P2: Baustein = {
     return [
       `(1) Der Arbeitgeber kann ${k.vorname} ${liste(w.gruende).join(", ") || "nach Ausspruch einer Kündigung"} bis zum Ende des Arbeitsverhältnisses ${unwider ? "unwiderruflich" : "widerruflich"} von der Arbeit freistellen, wenn sein Interesse an der Freistellung das Interesse an der Beschäftigung überwiegt.`,
       "(2) Während der Freistellung zahlt der Arbeitgeber die Vergütung weiter, einschließlich der variablen Bestandteile im Durchschnitt.",
-      unwider && ja(w.urlaub) ? `(3) Mit der unwiderruflichen Freistellung wird der Resturlaub gewährt; die Freistellung erfolgt zunächst unter Anrechnung des Urlaubs. Der Arbeitgeber legt die Lage des Urlaubs in der Erklärung fest.` : "",
+      unwider && ja(w.urlaub) ? `(3) Mit der unwiderruflichen Freistellung wird der Resturlaub gewährt; die Freistellung erfolgt zunächst unter Anrechnung des Urlaubs. Der Arbeitgeber legt die Lage des Urlaubs in der Erklärung fest.${ja(w.urlaubFolgejahr) ? " Reicht die Freistellung in das nächste Kalenderjahr, gewährt der Arbeitgeber vorsorglich auch den Urlaub des Folgejahres zu dessen Beginn." : ""}` : "",
       ja(w.ueberstunden) ? "Ein Guthaben aus Überstunden wird mit der Freistellung ausgeglichen." : "",
       ja(w.verdienst) ? `Was ${k.vorname} während der Freistellung durch anderweitige Arbeit verdient, wird nach § 615 Satz 2 BGB angerechnet.` : "",
       ja(w.rueckgabe) ? `${k.vorname} gibt auf Verlangen Arbeitsmittel zurück; für einen Dienstwagen mit privater Nutzung gilt die Regel zum Dienstwagen.` : "",
+      "Das Wettbewerbsverbot während des Arbeitsverhältnisses gilt auch in der Freistellung.",
+    ].filter(Boolean).join("\n");
+  },
+  labelEn: "Release from work after notice of termination",
+  textEn: (w, k) => {
+    const unwider = w.art !== "widerruflich";
+    return [
+      `(1) The Employer may release ${k.vorname} from work ${enListe(w.gruende, GRUENDE_EN).join(", ") || "after notice of termination has been given"} until the end of the employment relationship ${unwider ? "irrevocably" : "revocably"}, if its interest in the release outweighs the interest in continued employment.`,
+      "(2) During the release, the Employer continues to pay the remuneration, including the variable components on an average basis.",
+      unwider && ja(w.urlaub) ? `(3) The remaining holiday is granted with the irrevocable release; the release initially counts against the holiday entitlement. The Employer specifies the timing of the holiday in the declaration.${ja(w.urlaubFolgejahr) ? " If the release extends into the next calendar year, the Employer also grants, as a precaution, the holiday for the following year at its start." : ""}` : "",
+      ja(w.ueberstunden) ? "Any credit from overtime is compensated by the release." : "",
+      ja(w.verdienst) ? `Anything ${k.vorname} earns from other work during the release is credited under § 615 sentence 2 BGB.` : "",
+      ja(w.rueckgabe) ? `${k.vorname} returns work equipment on request; for a company car with private use, the provision on the company car applies.` : "",
+      "The prohibition of competition during the employment relationship also applies during the release.",
     ].filter(Boolean).join("\n");
   },
   normen: ["§ 106 GewO", "§ 615 BGB", "§ 11 KSchG", "§ 7 Abs. 1 BUrlG"],
@@ -128,13 +194,14 @@ const P2: Baustein = {
 };
 
 const P3: Baustein = {
-  id: "P3", gruppe: "P", label: "Verlängerte Kündigungsfristen", risiko: "grün", version: 1,
+  id: "P3", gruppe: "P", label: "Verlängerte Kündigungsfristen", risiko: "grün", version: 2,
   passt: "Für Fach- und Führungskräfte, bei denen beide Seiten mehr Vorlauf wollen.",
   fuer: OHNE_WS,
   felder: [
     { id: "fristMonate", label: "Kündigungsfrist des Arbeitgebers in Monaten", typ: "zahl", pflicht: true, min: 1 },
     { id: "fristPersonMonate", label: "Kündigungsfrist der Person in Monaten", typ: "zahl", pflicht: true, min: 1, hinweis: "Nie länger als die Frist des Arbeitgebers." },
     { id: "termin", label: "Kündigungstermin", typ: "auswahl", optionen: ["zum Monatsende", "zum Quartalsende"], standard: "zum Monatsende", pflicht: true },
+    { id: "verlaengerungBeide", label: "Gesetzliche Verlängerung nach Betriebszugehörigkeit gilt für beide Seiten", typ: "janein", standard: "nein", hinweis: "Gleiche Fristen für beide Seiten erlaubt § 622 Abs. 6 BGB. Schützt den Arbeitgeber, wenn langjährige Beschäftigte kündigen." },
   ],
   text: (w, k) => {
     const ag = zahl(w.fristMonate) ?? 0;
@@ -142,7 +209,21 @@ const P3: Baustein = {
     const termin = w.termin || "zum Monatsende";
     return [
       `(1) Nach der Probezeit kann der Arbeitgeber mit einer Frist von ${monateTextDativ(ag)} ${termin} kündigen, ${k.vorname} mit einer Frist von ${monateTextDativ(pe)} ${termin}.`,
-      "(2) Verlängert sich die Frist für den Arbeitgeber nach dem Gesetz, gilt die längere gesetzliche Frist für den Arbeitgeber; für die Person darf keine längere Frist gelten als für den Arbeitgeber (§ 622 BGB).",
+      ja(w.verlaengerungBeide)
+        ? `(2) Verlängert sich die Frist für den Arbeitgeber nach § 622 Abs. 2 BGB, gilt die längere gesetzliche Frist auch für eine Kündigung durch ${k.vorname}; für die Person gilt nie eine längere Frist als für den Arbeitgeber (§ 622 Abs. 6 BGB).`
+        : "(2) Verlängert sich die Frist für den Arbeitgeber nach dem Gesetz, gilt die längere gesetzliche Frist für den Arbeitgeber; für die Person darf keine längere Frist gelten als für den Arbeitgeber (§ 622 BGB).",
+    ].join("\n");
+  },
+  labelEn: "Extended notice periods",
+  textEn: (w, k) => {
+    const ag = zahl(w.fristMonate) ?? 0;
+    const pe = zahl(w.fristPersonMonate) ?? ag;
+    const termin = w.termin === "zum Quartalsende" ? "to the end of a calendar quarter" : "to the end of a calendar month";
+    return [
+      `(1) After the probationary period, the Employer may terminate with a notice period of ${monEn(ag)} ${termin}, and ${k.vorname} with a notice period of ${monEn(pe)} ${termin}.`,
+      ja(w.verlaengerungBeide)
+        ? `(2) If the notice period for the Employer is extended under § 622 para. 2 BGB, the longer statutory period also applies to notice given by ${k.vorname}; the Employee is never subject to a longer notice period than the Employer (§ 622 para. 6 BGB).`
+        : "(2) If the notice period for the Employer is extended by law, the longer statutory period applies to the Employer; the Employee may not be subject to a longer notice period than the Employer (§ 622 BGB).",
     ].join("\n");
   },
   normen: ["§ 622 Abs. 5 BGB", "§ 622 Abs. 6 BGB", "§ 624 BGB"],
@@ -175,6 +256,12 @@ const P4: Baustein = {
     "(2) Der Arbeitgeber händigt die Arbeitspapiere und eine Bescheinigung über den im Kalenderjahr gewährten Urlaub aus (§ 6 BUrlG).",
     `(3) Hinweis: Wer arbeitsuchend wird, muss sich spätestens ${monateText(WERTE.arbeitsuchendMeldung.monate)} vor dem Ende bei der Agentur für Arbeit melden; liegen zwischen Kenntnis und Ende weniger als ${monateText(WERTE.arbeitsuchendMeldung.monate)}, innerhalb von ${zahlwort(WERTE.arbeitsuchendMeldung.tage)} Tagen nach Kenntnis (§ 38 SGB III).`,
   ].join("\n"),
+  labelEn: "Reference, employment documents, registration as a jobseeker",
+  textEn: (w, k) => [
+    `(1) At the end of the employment relationship, ${k.vorname} receives a written reference and, on request, a qualified reference covering performance and conduct (§ 109 GewO).${ja(w.zwischenzeugnis) ? " Where there is good reason, an interim reference is issued on request." : ""}`,
+    "(2) The Employer hands over the employment documents and a certificate of the holiday granted in the calendar year (§ 6 BUrlG).",
+    `(3) Note: anyone who is about to become a jobseeker must register with the Federal Employment Agency no later than ${monEn(WERTE.arbeitsuchendMeldung.monate)} before the end; if less than ${monEn(WERTE.arbeitsuchendMeldung.monate)} lie between becoming aware and the end, within ${zahlwortEn(WERTE.arbeitsuchendMeldung.tage)} days of becoming aware (§ 38 SGB III).`,
+  ].join("\n"),
   normen: ["§ 109 GewO", "§ 38 SGB III", "§ 2 Abs. 2 SGB III", "§ 6 BUrlG"],
   quellen: ["https://www.gesetze-im-internet.de/gewo/__109.html", "https://www.gesetze-im-internet.de/sgb_3/__38.html", "Katalog Abschnitt 4, Baustein P4"],
   schutz: ["Nur Hinweise, keine Pflichten der Person über das Gesetz hinaus."],
@@ -203,6 +290,17 @@ const Q1: Baustein = {
     return [
       `(1) Ansprüche beider Seiten aus dem Arbeitsverhältnis und solche, die damit zusammenhängen, verfallen, wenn sie nicht innerhalb von ${monateTextDativ(m)} nach Fälligkeit in Textform gegenüber der anderen Seite geltend gemacht werden.${zweite}`,
       "(2) Die Fristen gelten nicht für Ansprüche auf den gesetzlichen Mindestlohn, für Haftung wegen Vorsatzes oder grober Fahrlässigkeit, für Schäden aus der Verletzung von Leben, Körper oder Gesundheit und für Ansprüche, die nach dem Gesetz nicht ausgeschlossen werden können.",
+    ].join("\n");
+  },
+  labelEn: "Exclusion period",
+  textEn: (w) => {
+    const m = zahl(w.dauerMonate) ?? MIN_AUSSCHLUSS;
+    const z = zahl(w.zweiteMonate) ?? MIN_AUSSCHLUSS;
+    const reaktion = zahlwortEn(WERTE.ausschlussfristMonate.zweiteStufeWochen);
+    const zweite = w.stufen === "einstufig" ? "" : ` If the other party rejects the claim or does not respond within ${reaktion} weeks of it being asserted, the claim lapses unless it is asserted in court within a further ${monEn(z)}.`;
+    return [
+      `(1) Claims of both parties arising from the employment relationship and claims connected with it lapse unless they are asserted against the other party in text form within ${monEn(m)} of falling due.${zweite}`,
+      "(2) These periods do not apply to claims to the statutory minimum wage, to liability for intent or gross negligence, to damage arising from injury to life, body or health, or to claims that cannot be excluded by law.",
     ].join("\n");
   },
   normen: ["§ 3 MiLoG", "§ 202 BGB", "§ 309 Nr. 7 BGB", "§ 309 Nr. 13 BGB", "§ 307 BGB", "§ 12 EFZG"],
@@ -239,6 +337,17 @@ const Q2: Baustein = {
     `(1) Auf das Arbeitsverhältnis findet ${w.umfang === "nur einzelne Teile" ? `mit folgenden Teilen (${w.teile || "[Teile]"}) ` : ""}der ${w.tarifvertrag || "[Tarifvertrag]"} ${w.art === "statisch" ? `in der Fassung vom ${w.fassung || "[Datum]"}` : `in seiner jeweils geltenden Fassung, derzeit in der Fassung vom ${w.fassung || "[Datum]"},`} Anwendung.`,
     `(2) Diese Bezugnahme gilt auch dann, wenn der Arbeitgeber nicht oder nicht mehr tarifgebunden ist. Günstigere Vereinbarungen in diesem Vertrag zugunsten von ${k.vorname} gehen vor.`,
   ].join("\n"),
+  labelEn: "Reference to a collective agreement",
+  textEn: (w, k) => {
+    const teile = w.umfang === "nur einzelne Teile";
+    const tv = frei(w.tarifvertrag) || "[collective agreement]";
+    const fassung = w.fassung ? (isISODate(w.fassung) ? datumEn(w.fassung) : w.fassung) : "[date]";
+    const stand = w.art === "statisch" ? `in the version of ${fassung}` : `as amended from time to time, currently in the version of ${fassung},`;
+    return [
+      `(1) ${teile ? `The following parts (${frei(w.teile) || "[parts]"}) of the` : "The"} ${tv} ${stand} ${teile ? "apply" : "applies"} to the employment relationship.`,
+      `(2) This reference also applies if the Employer is not, or is no longer, bound by collective agreements. More favourable arrangements in this contract in favour of ${k.vorname} take precedence.`,
+    ].join("\n");
+  },
   normen: ["§ 2 Abs. 1 Satz 2 Nr. 15 NachwG", "§ 3 TVG", "§ 4 TVG", "§ 305c BGB", "§ 307 BGB"],
   quellen: ["https://www.gesetze-im-internet.de/nachwg/__2.html", "https://www.gesetze-im-internet.de/tvg/__4.html", "Katalog Abschnitt 4, Baustein Q2"],
   urteile: [{ az: "BAG 4 AZR 652/05", kennung: "P" }],
@@ -248,22 +357,37 @@ const Q2: Baustein = {
 };
 
 const Q3: Baustein = {
-  id: "Q3", gruppe: "Q", label: "Betriebsvereinbarungen und Richtlinien", risiko: "grün", version: 1, ersetzt: "§ 14",
+  id: "Q3", gruppe: "Q", label: "Betriebsvereinbarungen und Richtlinien", risiko: "grün", ersetzt: "§ 14",
+  version: 2,
   passt: "Für Firmen mit Betriebsrat oder internen Richtlinien (Reisekosten, Homeoffice).",
   fuer: MIT_AUSBILDUNG,
   felder: [
     { id: "regelwerke", label: "Betriebsvereinbarungen und Richtlinien (Liste)", typ: "lang", pflicht: true },
     { id: "zugriff", label: "Zugang", typ: "auswahl", optionen: ["im Intranet", "als Aushändigung in Kopie", "zur Einsicht in der Personalabteilung"], standard: "im Intranet", pflicht: true },
+    { id: "offen", label: "Betriebsvereinbarungsoffen: spätere Betriebsvereinbarungen gehen dem Vertrag vor, auch wenn sie ungünstiger sind", typ: "janein", standard: "nein", hinweis: "Nur mit Betriebsrat sinnvoll. Gehalt und Arbeitszeit aus diesem Vertrag bleiben ausgenommen. Reichweite von der Kanzlei prüfen lassen." },
   ],
   text: (w, k) => [
     `(1) Für das Arbeitsverhältnis gelten die Betriebsvereinbarungen und Richtlinien in ihrer jeweiligen Fassung, derzeit: ${w.regelwerke?.trim() || "[Liste]"}. ${k.vorname} kann sie ${w.zugriff || "im Intranet"} einsehen.`,
-    `(2) Betriebsvereinbarungen gelten unmittelbar und zwingend. Günstigere Regeln in diesem Vertrag zugunsten von ${k.vorname} gehen vor.`,
+    ja(w.offen)
+      ? `(2) Betriebsvereinbarungen gelten unmittelbar und zwingend. Regelt eine Betriebsvereinbarung denselben Gegenstand wie dieser Vertrag, geht sie vor, auch wenn sie für ${k.vorname} ungünstiger ist. Ausgenommen sind Gehalt und Arbeitszeit, die in diesem Vertrag einzeln vereinbart sind.`
+      : `(2) Betriebsvereinbarungen gelten unmittelbar und zwingend. Günstigere Regeln in diesem Vertrag zugunsten von ${k.vorname} gehen vor.`,
+  ].join("\n"),
+  labelEn: "Works agreements and policies",
+  textEn: (w, k) => [
+    `(1) The works agreements (Betriebsvereinbarungen) and policies as amended from time to time apply to the employment relationship, currently: ${frei(w.regelwerke) || "[list]"}. ${k.vorname} can view them ${ZUGRIFF_EN[w.zugriff ?? ""] ?? "on the intranet"}.`,
+    ja(w.offen)
+      ? `(2) Works agreements apply directly and with binding effect. If a works agreement governs the same matter as this contract, it takes precedence, even if it is less favourable for ${k.vorname}. Salary and working hours individually agreed in this contract are excluded.`
+      : `(2) Works agreements apply directly and with binding effect. More favourable rules in this contract in favour of ${k.vorname} take precedence.`,
   ].join("\n"),
   normen: ["§ 77 BetrVG", "§ 2 Abs. 1 Satz 2 Nr. 15 NachwG"],
   quellen: ["https://www.gesetze-im-internet.de/betrvg/__77.html", "Katalog Abschnitt 4, Baustein Q3"],
   schutz: ["Verweis ohne Verschlechterung einer Betriebsvereinbarung."],
   sperren: ["Klausel, die eine Betriebsvereinbarung zu Lasten der Person ändert."],
-  stichwoerter: ["Betriebsvereinbarung", "Richtlinie", "Policy", "Betriebsrat"],
+  stichwoerter: ["Betriebsvereinbarung", "Richtlinie", "Policy", "Betriebsrat", "betriebsvereinbarungsoffen"],
+  regeln: [
+    regel("P-107", "warnung", "Q3 betriebsvereinbarungsoffen", "§ 77 Abs. 4 BetrVG, § 307 BGB (BAG 1 AZR 417/12, Aktenzeichen prüfen)", ["Q3"], (l) =>
+      wenn(hat(l, "Q3") && wert(l, "Q3", "offen") === "ja", `Spätere Betriebsvereinbarungen sollen auch zu Lasten der Person vorgehen. Ob die Öffnung so weit und so klar genug ist, entscheidet die Kanzlei.${l.firma.betriebsrat ? "" : " Ohne Betriebsrat gibt es keine Betriebsvereinbarung, die Klausel läuft dann ins Leere."}`)),
+  ],
 };
 
 const DOPPELT = "doppelte Schriftform (auch für die Aufhebung dieser Klausel)";
@@ -280,6 +404,12 @@ const Q4: Baustein = {
     "(1) Änderungen und Ergänzungen dieses Vertrags bedürfen der Textform.",
     "(2) Individuelle Vereinbarungen haben Vorrang, auch wenn sie mündlich getroffen werden (§ 305b BGB).",
     ja(w.salvatorisch) || !w.salvatorisch ? "(3) Sollte eine Bestimmung unwirksam sein, bleibt der Vertrag im Übrigen wirksam. Das gilt nicht als Ersatz für eine fehlende Karenzentschädigung." : "",
+  ].filter(Boolean).join("\n"),
+  labelEn: "Final provisions",
+  textEn: (w) => [
+    "(1) Amendments and additions to this contract require text form.",
+    "(2) Individual agreements take precedence, even if they are made orally (§ 305b BGB).",
+    ja(w.salvatorisch) || !w.salvatorisch ? "(3) Should any provision be invalid, the remainder of the contract remains valid. This does not replace missing compensation for a post-contractual non-competition covenant (Karenzentschädigung)." : "",
   ].filter(Boolean).join("\n"),
   normen: ["§ 305b BGB", "§ 309 Nr. 13 BGB", "§ 125 BGB"],
   quellen: ["https://www.gesetze-im-internet.de/bgb/__305b.html", "https://www.gesetze-im-internet.de/bgb/__309.html", "Katalog Abschnitt 4, Baustein Q4"],
@@ -308,6 +438,12 @@ const Q5: Baustein = {
     "(2) Für Streitigkeiten sind die Arbeitsgerichte nach den gesetzlichen Regeln zuständig.",
     w.sprache === "Deutsch mit Übersetzung" ? `(3) Der Vertrag ist in deutscher Sprache geschlossen. Die Übersetzung in ${w.uebersetzung || "[Sprache]"} dient dem Verständnis; maßgeblich ist die deutsche Fassung.` : "",
   ].filter(Boolean).join("\n"),
+  labelEn: "Applicable law, place of jurisdiction, contract language",
+  textEn: (w) => [
+    "(1) German law applies to the employment relationship. Mandatory protective provisions of the state in which the work is habitually carried out remain unaffected (Art. 8 Rom-I-VO).",
+    "(2) Disputes fall within the jurisdiction of the labour courts in accordance with the statutory rules.",
+    w.sprache === "Deutsch mit Übersetzung" ? `(3) The contract is concluded in German. The translation into ${frei(w.uebersetzung) || "[language]"} is provided for information; the German version prevails.` : "",
+  ].filter(Boolean).join("\n"),
   normen: ["§ 38 ZPO", "§ 48 ArbGG", "Art. 8 Rom-I-VO", "§ 101 ArbGG"],
   quellen: ["https://www.gesetze-im-internet.de/arbgg/__48.html", "https://eur-lex.europa.eu/eli/reg/2008/593/oj", "Katalog Abschnitt 4, Baustein Q5"],
   schutz: ["Kein Gerichtsstand außerhalb des gesetzlichen.", "Bei Beschäftigung im Ausland Hinweis auf B7."],
@@ -326,6 +462,11 @@ const Q6: Baustein = {
     `(1) Für folgende Leistungen gilt der Freiwilligkeitsvorbehalt${"D21" in k.auswahl ? " nach der Regel zu freiwilligen Leistungen in diesem Vertrag" : " (Baustein D21)"}: ${w.leistungen?.trim() || "[Leistungen]"}. Auch eine wiederholte Zahlung begründet für diese Leistungen keinen Anspruch für die Zukunft, wenn der Arbeitgeber bei jeder Zahlung auf die Freiwilligkeit hinweist.`,
     "(2) Für laufendes Entgelt gilt dieser Absatz nicht.",
   ].join("\n"),
+  labelEn: "Exclusion of company practice",
+  textEn: (w, k) => [
+    `(1) The reservation of voluntariness${"D21" in k.auswahl ? " under the provision on voluntary benefits in this contract" : " (clause D21)"} applies to the following benefits: ${frei(w.leistungen) || "[benefits]"}. Even repeated payment does not give rise to a claim to these benefits for the future, provided the Employer points out the voluntary nature with each payment.`,
+    "(2) This paragraph does not apply to regular remuneration.",
+  ].join("\n"),
   normen: ["§ 305b BGB", "§ 307 BGB"],
   quellen: ["https://www.gesetze-im-internet.de/bgb/__305b.html", "Katalog Abschnitt 4, Baustein Q6 und D21"],
   schutz: ["Nur mit Verweis auf den Freiwilligkeitsvorbehalt D21, kein pauschaler Ausschluss."],
@@ -340,11 +481,15 @@ const Q7: Baustein = {
   felder: [
     { id: "unterlagen", label: "Ausgehändigte Unterlagen", typ: "mehrfach", optionen: ["Ausfertigung dieses Vertrags", "Stellenbeschreibung", "Richtlinien", "Datenschutzinformation", "Betriebsvereinbarungen"], standard: "Ausfertigung dieses Vertrags|Datenschutzinformation", pflicht: true },
   ],
+  // Überschrift und Zeile für Ort, Datum und Unterschrift setzen Anlage und Layout (lib/vertragsbausteine/vertrag.ts, lib/dokumente/layout.ts, Prüfung 23.10.2026 A4.8).
   text: (w, k) => [
-    `Empfangsbestätigung (eigene Seite, gesondert unterschrieben)`,
     `${k.vorname} bestätigt, folgende Unterlagen erhalten zu haben: ${liste(w.unterlagen).join(", ") || "[Unterlagen]"}.`,
     "Diese Bestätigung steht auf einer eigenen Seite und wird gesondert unterschrieben. Sie bestätigt nur den Erhalt, nicht das Verständnis oder die Richtigkeit des Inhalts.",
-    `Ort, Datum, Unterschrift ${k.vorname}`,
+  ].join("\n"),
+  labelEn: "Acknowledgement of receipt of documents",
+  textEn: (w, k) => [
+    `${k.vorname} confirms having received the following documents: ${enListe(w.unterlagen, UNTERLAGEN_EN).join(", ") || "[documents]"}.`,
+    "This confirmation is on a separate page and is signed separately. It confirms receipt only, not understanding or the accuracy of the content.",
   ].join("\n"),
   normen: ["§ 309 Nr. 12 BGB", "§ 2 NachwG", "§ 3 NachwG"],
   quellen: ["https://www.gesetze-im-internet.de/bgb/__309.html", "https://www.gesetze-im-internet.de/nachwg/__2.html", "Katalog Abschnitt 4, Baustein Q7"],
@@ -363,6 +508,11 @@ const Q8: Baustein = {
   text: (w, k) => [
     `(1) ${k.vorname} teilt Änderungen folgender Angaben unverzüglich in Textform mit: ${liste(w.angaben).join(", ") || "[Angaben]"}.`,
     "(2) Angaben zur Gesundheit oder zur Familienplanung muss niemand mitteilen.",
+  ].join("\n"),
+  labelEn: "Notification of changed personal data",
+  textEn: (w, k) => [
+    `(1) ${k.vorname} notifies changes to the following details in text form without undue delay: ${enListe(w.angaben, ANGABEN_EN).join(", ") || "[details]"}.`,
+    "(2) Nobody is required to disclose information on health or family planning.",
   ].join("\n"),
   normen: ["§ 241 Abs. 2 BGB", "Art. 5 DSGVO"],
   quellen: ["https://www.gesetze-im-internet.de/bgb/__241.html", "https://eur-lex.europa.eu/eli/reg/2016/679/oj", "Katalog Abschnitt 4, Baustein Q8"],
@@ -389,6 +539,15 @@ const S1: Baustein = {
       ja(w.kodex) ? "(3) Der Verhaltenskodex des Arbeitgebers liegt als Anlage bei." : "",
     ].filter(Boolean).join("\n");
   },
+  labelEn: "Compliance, gifts, conflicts of interest",
+  textEn: (w, k) => {
+    const g = zahl(w.wertgrenze);
+    return [
+      `(1) In connection with the work, ${k.vorname} neither accepts nor grants gifts or benefits${g !== null ? ` exceeding ${euroEn(g)} in the individual case` : " beyond customary occasional gifts"}.`,
+      `(2) ${k.vorname} discloses conflicts of interest and holdings in business partners in text form.`,
+      ja(w.kodex) ? "(3) The Employer's code of conduct is attached as an annex." : "",
+    ].filter(Boolean).join("\n");
+  },
   normen: ["§ 299 StGB", "§ 331 StGB", "§ 241 Abs. 2 BGB", "§ 87 Abs. 1 Nr. 1 BetrVG"],
   quellen: ["https://www.gesetze-im-internet.de/stgb/__299.html", "Katalog Abschnitt 4, Baustein S1"],
   schutz: ["Kodex als Anlage."],
@@ -406,6 +565,10 @@ const S2: Baustein = {
   text: (w, k) => w.regel === "kein Alkohol und keine Drogen während der Arbeit"
     ? `${k.vorname} tritt die Arbeit nicht unter dem Einfluss von Alkohol oder Drogen an und nimmt sie während der Arbeit nicht zu sich. Im Übrigen gilt die Betriebsordnung.`
     : `Für Alkohol, Drogen, Rauchen und die Ordnung im Betrieb gilt die Betriebsordnung in ihrer jeweiligen Fassung.`,
+  labelEn: "Alcohol, drugs, smoking, workplace rules",
+  textEn: (w, k) => w.regel === "kein Alkohol und keine Drogen während der Arbeit"
+    ? `${k.vorname} does not start work under the influence of alcohol or drugs and does not consume them during work. Otherwise, the workplace rules apply.`
+    : "The workplace rules as amended from time to time apply to alcohol, drugs, smoking and order in the workplace.",
   normen: ["DGUV Vorschrift 1", "§ 87 Abs. 1 Nr. 1 BetrVG"],
   quellen: ["https://www.gesetze-im-internet.de/betrvg/__87.html", "Katalog Abschnitt 4, Baustein S2"],
   schutz: ["Verweis auf Betriebsordnung, keine Strafen."],
@@ -425,6 +588,12 @@ const S3: Baustein = {
     `(1) ${k.vorname} nimmt an den Unterweisungen zum Arbeitsschutz teil, befolgt die Anweisungen zur Sicherheit und meldet Mängel und Gefahren unverzüglich (§§ 15, 16 ArbSchG).`,
     ja(w.pflichtvorsorge) ? `(2) Die Tätigkeit setzt eine arbeitsmedizinische Pflichtvorsorge voraus. ${k.vorname} nimmt an ihr teil. Der Arbeitgeber erhält nur die Bescheinigung über die Teilnahme, nicht das Ergebnis.` : "",
     ja(w.ersthelfer) ? `${k.vorname} wird nach Ausbildung als Ersthelfer:in eingesetzt; die Ausbildung zahlt der Arbeitgeber und sie findet in der Arbeitszeit statt.` : "",
+  ].filter(Boolean).join("\n"),
+  labelEn: "Occupational safety, health checks, instruction",
+  textEn: (w, k) => [
+    `(1) ${k.vorname} takes part in occupational safety instruction, follows the safety instructions and reports defects and hazards without undue delay (§§ 15, 16 ArbSchG).`,
+    ja(w.pflichtvorsorge) ? `(2) The work requires mandatory occupational health checks (Pflichtvorsorge). ${k.vorname} takes part in them. The Employer receives only the certificate of attendance, not the result.` : "",
+    ja(w.ersthelfer) ? `After training, ${k.vorname} is deployed as a first aider; the Employer pays for the training and it takes place during working time.` : "",
   ].filter(Boolean).join("\n"),
   normen: ["§ 12 ArbSchG", "§ 15 ArbSchG", "§ 16 ArbSchG", "ASiG", "ArbMedVV"],
   quellen: ["https://www.gesetze-im-internet.de/arbschg/__15.html", "https://www.gesetze-im-internet.de/arbmedvv/", "Katalog Abschnitt 4, Baustein S3"],
@@ -450,12 +619,23 @@ const S4: Baustein = {
       `(2) Nach dem Ende des Arbeitsverhältnisses gelten für die Räumung die gesetzlichen Kündigungsfristen und der Mieterschutz (${miet ? "§ 576 BGB" : "§ 576b BGB"}).`,
     ].join("\n");
   },
+  labelEn: "Company housing",
+  textEn: (w, k) => {
+    const s = zahl(w.sachbezug);
+    const miet = w.art?.startsWith("Werkmietwohnung");
+    return [
+      `(1) ${k.vorname} ${miet ? "rents" : "uses"} the flat at ${w.wohnung || "[address]"}${miet ? " under a separate tenancy agreement" : " as part of the employment relationship"}.${s !== null ? ` ${miet ? "The rent" : "The non-cash benefit value"} is ${euroEn(s)} per month.` : ""}`,
+      `(2) After the end of the employment relationship, the statutory notice periods and tenant protection apply to vacating the flat (${miet ? "§ 576 BGB" : "§ 576b BGB"}).`,
+    ].join("\n");
+  },
   normen: ["§ 576 BGB", "§ 576b BGB"],
   quellen: ["https://www.gesetze-im-internet.de/bgb/__576.html", "https://www.gesetze-im-internet.de/bgb/__576b.html", "Katalog Abschnitt 4, Baustein S4"],
   schutz: ["Arbeits- und Mietvertrag getrennt.", "Räumungsfristen nach Gesetz."],
   sperren: ["Räumung ohne Frist."],
   stichwoerter: ["Dienstwohnung", "Werkswohnung", "Wohnung", "Hausmeister"],
 };
+
+const AUFSTOCKUNG_STANDARD = "in gesetzlicher Höhe nach dem AltTZG";
 
 const S5: Baustein = {
   id: "S5", gruppe: "S", label: "Altersteilzeit", risiko: "gelb", version: 1,
@@ -465,13 +645,22 @@ const S5: Baustein = {
     { id: "modell", label: "Modell", typ: "auswahl", optionen: ["Blockmodell", "kontinuierlich"], standard: "kontinuierlich", pflicht: true },
     { id: "beginn", label: "Beginn", typ: "datum", pflicht: true },
     { id: "ende", label: "Ende", typ: "datum", pflicht: true },
-    { id: "aufstockung", label: "Aufstockung (Beschreibung)", typ: "text", standard: "in gesetzlicher Höhe nach dem AltTZG" },
+    { id: "aufstockung", label: "Aufstockung (Beschreibung)", typ: "text", standard: AUFSTOCKUNG_STANDARD },
   ],
   text: (w, k) => [
     `(1) ${k.vorname} arbeitet vom ${isISODate(w.beginn) ? formatDE(w.beginn) : "[Beginn]"} bis zum ${isISODate(w.ende) ? formatDE(w.ende) : "[Ende]"} in Altersteilzeit im ${w.modell === "Blockmodell" ? "Blockmodell (Arbeitsphase, dann Freistellungsphase)" : "kontinuierlichen Modell (gleichmäßig verringerte Arbeitszeit)"}.`,
     `(2) Der Arbeitgeber stockt das Entgelt ${w.aufstockung?.trim() || "in gesetzlicher Höhe nach dem AltTZG"} auf.`,
     "(3) Wertguthaben sind gegen Insolvenz des Arbeitgebers gesichert (§ 8a AltTZG). Der Arbeitgeber weist die Sicherung in Textform nach.",
   ].join("\n"),
+  labelEn: "Partial retirement",
+  textEn: (w, k) => {
+    const auf = w.aufstockung?.trim();
+    return [
+      `(1) ${k.vorname} works in partial retirement (Altersteilzeit) from ${isISODate(w.beginn) ? datumEn(w.beginn) : "[start]"} to ${isISODate(w.ende) ? datumEn(w.ende) : "[end]"} under the ${w.modell === "Blockmodell" ? "block model (work phase, then release phase)" : "continuous model (evenly reduced working time)"}.`,
+      `(2) The Employer tops up the pay ${!auf || auf === AUFSTOCKUNG_STANDARD ? "at the statutory rate under the AltTZG" : frei(auf)}.`,
+      "(3) Value credits are protected against the insolvency of the Employer (§ 8a AltTZG). The Employer provides evidence of this protection in text form.",
+    ].join("\n");
+  },
   normen: ["AltTZG", "§ 8a AltTZG"],
   quellen: ["https://www.gesetze-im-internet.de/alttzg_1996/__8a.html", "Katalog Abschnitt 4, Baustein S5"],
   schutz: ["Insolvenzsicherung Pflicht und immer im Text."],
@@ -489,6 +678,11 @@ const S6: Baustein = {
   text: (w, k) => [
     ja(w.vorrang) ? `(1) Wünscht ${k.vorname} eine längere Arbeitszeit, berücksichtigt der Arbeitgeber das bei der Besetzung eines passenden freien Arbeitsplatzes bevorzugt (§ 9 TzBfG).` : "",
     `(2) Die gesetzlichen Rechte auf Verringerung der Arbeitszeit (§ 8 TzBfG) und auf Brückenteilzeit (§ 9a TzBfG) bleiben unberührt. ${k.vorname} teilt Wünsche zur Arbeitszeit in Textform mit.`,
+  ].filter(Boolean).join("\n"),
+  labelEn: "Part-time, increase in hours and return to full-time",
+  textEn: (w, k) => [
+    ja(w.vorrang) ? `(1) If ${k.vorname} wishes to work longer hours, the Employer gives preference to this when filling a suitable vacant position (§ 9 TzBfG).` : "",
+    `(2) The statutory rights to reduce working time (§ 8 TzBfG) and to bridge part-time work (§ 9a TzBfG) remain unaffected. ${k.vorname} communicates wishes regarding working time in text form.`,
   ].filter(Boolean).join("\n"),
   normen: ["§ 8 TzBfG", "§ 9 TzBfG", "§ 9a TzBfG"],
   quellen: ["https://www.gesetze-im-internet.de/tzbfg/__9.html", "https://www.gesetze-im-internet.de/tzbfg/__9a.html", "Katalog Abschnitt 4, Baustein S6"],

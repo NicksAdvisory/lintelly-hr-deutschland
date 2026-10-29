@@ -33,7 +33,7 @@ const STANDARD: Record<string, Record<string, string>> = {
   C7: { haeufigkeit: "5", reaktionMinuten: "30", pauschale: "50", einsatz: "als Arbeitszeit mit dem anteiligen Stundenlohn" },
   C8: { stundenMonat: "40", bewertung: "50" },
   C9: { mindestStunden: "10", zeitrahmen: "Montag bis Freitag, 8 bis 18 Uhr", ankuendigungTage: "4" },
-  C10: { voraussetzung: "erheblicher Arbeitsausfall mit Anzeige bei der Agentur für Arbeit", ankuendigungTage: "14", hoechstMonate: "6", umfang: "teilweise Verkürzung" },
+  C10: { voraussetzung: "erheblicher Arbeitsausfall mit Anzeige bei der Agentur für Arbeit", ankuendigungTage: "14", hoechstMonate: "6", umfang: "teilweise Verkürzung", anpassungTage: "3" },
   C11: { nachtAusgleich: "Zuschlag", nachtZuschlag: "25" },
   C12: { art: "Sabbatical", anspar: "Ein Teil des Gehalts wird angespart", entnahme: "Freistellung nach Ankündigung", insolvenz: "doppelseitige Treuhand", bewertung: "in Geld" },
 };
@@ -240,10 +240,16 @@ describe("Regeln Gruppe B", () => {
     expect(schlaegt(mit("B1", { umfang: "vorübergehend auch niedriger bewertete Tätigkeit", dauerMonate: "3", entgeltschutz: "nein" }), "P-020")).toBe(true);
     expect(schlaegt(mit("B1", { umfang: "vorübergehend auch niedriger bewertete Tätigkeit", dauerMonate: "3", entgeltschutz: "ja" }), "P-020")).toBe(false);
   });
-  it("P-021 Versetzung ohne räumliche Grenze", () => {
+  it("P-021 Versetzung ohne räumliche Grenze: Warnung statt Sperre (Entscheidung 24, § 106 GewO)", () => {
     expect(schlaegt(mit("B2", { radiusKm: "" }), "P-021")).toBe(true);
     expect(schlaegt(mit("B2", { grenze: "genannte Standorte", orte: "bundesweit alle Standorte" }), "P-021")).toBe(true);
+    expect(befund(mit("B2", { grenze: "alle Standorte des Arbeitgebers in Deutschland" }), "P-021")[0]?.art).toBe("warnung");
     expect(schlaegt(mit("B2"), "P-021")).toBe(false);
+  });
+  it("B2 bundesweit an Standorte desselben Arbeitgebers, nicht ins Ausland", () => {
+    const t = text("B2", { standort: "Köln", grenze: "alle Standorte des Arbeitgebers in Deutschland" });
+    expect(t).toContain("an einen anderen Standort des Arbeitgebers in Deutschland");
+    expect(BAUSTEIN.B2.textEn({ standort: "Köln", grenze: "alle Standorte des Arbeitgebers in Deutschland" }, { vorname: "Paul", gehalt: 4500, wochenstunden: 40, eintritt: "2026-11-01", heute: "2026-10-10", auswahl: {} })).toContain("to another site of the Employer in Germany");
   });
   it("P-022 Versetzung in andere Gesellschaft", () => {
     expect(schlaegt(mit("B2", { andereGesellschaft: "ja" }), "P-022")).toBe(true);

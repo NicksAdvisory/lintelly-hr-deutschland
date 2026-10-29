@@ -54,5 +54,20 @@ export function berechneMinijob(lohn: number, stunden: number | null, basis: Bas
     unterMindestlohn: lohn < s.mindestlohn,
     differenz: Math.round((s.mindestlohn - lohn) * 100) / 100,
     imMinijob: jahresEntgelt === null ? null : jahresEntgelt <= jahresGrenze,
+    /** Warum kein Minijob: schon der Monat liegt über der Grenze, oder erst das Jahr mit Einmalzahlungen */
+    grund: jahresEntgelt === null || jahresEntgelt <= jahresGrenze ? null : monatsEntgelt! > s.grenze ? ("monat" as const) : ("jahr" as const),
+  };
+}
+
+/**
+ * Weiche Hinweise und Tippfehler (UX-Review 28.10.2026, C9). "14 50" liest parseNum als 1450,
+ * deshalb fängt die Oberfläche Leerzeichen zwischen Ziffern vorher ab.
+ */
+export const zifferMitLeerzeichen = (s: string) => /\d\s+\d/.test(s.trim());
+
+export function plausiMinijob(stunden: number | null, einmal: number, jahr: Jahr) {
+  return {
+    stunden: stunden === 0 ? "0 Stunden: Stimmt das? Dann verdient die Person nichts." : undefined,
+    einmal: einmal > STAND[jahr].grenze * 12 ? `Stimmt das? Das ist mehr als die ganze Jahresgrenze von ${(STAND[jahr].grenze * 12).toLocaleString("de-DE")} €.` : undefined,
   };
 }

@@ -25,8 +25,8 @@ describe("Grenzen", () => {
     const fremd = importe.filter((i) => !i.ziel.startsWith(".") && !i.ziel.startsWith("@/") && !i.ziel.startsWith("node:") && !i.ziel.startsWith("@modelcontextprotocol/sdk/"));
     expect(fremd).toEqual([]);
   });
-  it("Dateien schreibt nur der Zähler, und nur in ZAEHLER_ORDNER", () => {
-    const schreiben = importe.filter((i) => i.ziel === "node:fs" && i.datei.startsWith("mcp/src"));
+  it("Dateien schreibt nur der Zähler, und nur in ZAEHLER_ORDNER, auch nicht der Kern (beim npx-Start beim Nutzer)", () => {
+    const schreiben = importe.filter((i) => /^(node:)?fs(\/promises)?$/.test(i.ziel));
     expect(schreiben.map((i) => i.datei)).toEqual(["mcp/src/zaehler.ts"]);
   });
 });

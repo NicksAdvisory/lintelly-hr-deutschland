@@ -120,15 +120,29 @@ export function berechneFrist(typ: DokTyp, datum: Date, pruefung: Pruefung | nul
   return null;
 }
 
+/** Liest die Angaben zur Betriebsprüfung. Beide leer heißt: noch nie geprüft. */
+export function pruefungLesen(bis: Date | null, am: Date | null): { pruefung: Pruefung | null; fehler?: string } {
+  if (!bis && !am) return { pruefung: null };
+  if (!bis || !am) return { pruefung: null, fehler: "Trag beide Daten der Betriebsprüfung ein oder lass beide leer." };
+  if (bis > am) return { pruefung: null, fehler: "Der geprüfte Zeitraum kann nicht nach dem Tag der Prüfung enden. Schau im Prüfbescheid nach." };
+  return { pruefung: { bis, am } };
+}
+
 /**
- * Darf das Dokument heute weg? Entgeltunterlagen der Sozialversicherung sind meist zugleich Lohnbelege. Dann gilt
- * zusätzlich die steuerliche Frist von 8 Jahren, und "jetzt löschen" stimmt erst, wenn auch sie abgelaufen ist.
+ * Verbindliche Frist. Entgeltunterlagen der Sozialversicherung sind meist zugleich Lohnbelege. Dann gilt die spätere
+ * von SV-Frist und steuerlicher Frist (8 Jahre). `sv` ist die kürzere SV-Frist, wenn die steuerliche länger läuft.
  */
-export function jetztLoeschen(typ: DokTyp, datum: Date, pruefung: Pruefung | null, heute: Date) {
+export function verbindlicheFrist(typ: DokTyp, datum: Date, pruefung: Pruefung | null = null): { bis: Date; ab: Date; sv?: { bis: Date; ab: Date } } | null {
   const f = berechneFrist(typ, datum, pruefung);
-  if (!f || f.ab > heute) return false;
-  if (typ.regel.art !== "sv") return true;
-  return jahresendeFrist(datum, 8) < heute;
+  if (!f || typ.regel.art !== "sv") return f;
+  const steuer = jahresendeFrist(datum, 8);
+  return steuer > f.bis ? { bis: steuer, ab: addDays(steuer, 1), sv: f } : f;
+}
+
+/** Darf das Dokument heute weg? Bei Entgeltunterlagen erst, wenn auch die steuerliche Frist abgelaufen ist. */
+export function jetztLoeschen(typ: DokTyp, datum: Date, pruefung: Pruefung | null, heute: Date) {
+  const f = verbindlicheFrist(typ, datum, pruefung);
+  return !!f && f.ab <= heute;
 }
 
 /** Löschplan nach dem Austritt: je Unterlage aufbewahren bis und löschen ab. */

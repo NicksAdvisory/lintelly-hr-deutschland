@@ -1,5 +1,5 @@
 /** Fristen und Zeiten aus den Rechnern von lintelly.com/tools. Die Rechnung steht in packages/kern, hier nur Eingabe und Antwort. */
-import { berechneFrist, DOKUMENTE, jetztLoeschen, loeschplan } from "../../../kern/website/components/tools/aufbewahrungsfristen-logik";
+import { DOKUMENTE, jetztLoeschen, loeschplan, pruefungLesen, verbindlicheFrist } from "../../../kern/website/components/tools/aufbewahrungsfristen-logik";
 import { pruefeBefristung, type Schrift, type Vorbesch } from "../../../kern/website/components/tools/befristung-logik";
 import { addDays, diffDays, fmt, fmtDay, fromDay, parseYmd, toDay, toYmd } from "../../../kern/website/components/tools/datum";
 import { berechneElternzeit, TEXTFORM_AB } from "../../../kern/website/components/tools/elternzeit-logik";
@@ -46,6 +46,10 @@ const probezeit: Werkzeug = {
     const vorbei = toYmd(r.ende) < heute;
     const wochenende = +r.zugangEmpf !== +r.ende;
     const anteil = r.anteil === null ? null : Math.round(r.anteil * 100);
+    // Bei kurzer Probezeit liegen Gespräch oder Entscheidung vor dem ersten Arbeitstag und entfallen (lintelly.com 28.10.2026).
+    const termine = r.gespraech && r.entscheidung
+      ? `Probezeitgespräch 4 Wochen vor dem Ende: bis ${fmt(r.gespraech)}. Entscheidung 2 Wochen vor dem Ende: bis ${fmt(r.entscheidung)}.`
+      : r.entscheidung ? `Probezeit kurz: Gespräch und Entscheidung zusammen bis ${fmt(r.entscheidung)}.` : "Probezeit sehr kurz: Gespräch und Entscheidung gleich in den ersten Tagen.";
     quellen.push(normQuelle("§ 188 Abs. 2 BGB"), normQuelle("§ 623 BGB"));
     if (!azubi && groesse !== "gross") quellen.push(normQuelle("§ 23 Abs. 1 KSchG"));
     if (r.luecke) quellen.push(normQuelle("§ 622 Abs. 1 BGB"));
@@ -61,8 +65,8 @@ const probezeit: Werkzeug = {
         wartezeit_kschg_ende: azubi ? null : toYmd(r.wartezeitEnde),
         kuendigungsschutz_ab: azubi || groesse === "klein" ? null : toYmd(r.kschgAb),
         luecke_bis_kuendigungsschutz: r.luecke,
-        probezeitgespraech_bis: toYmd(r.gespraech),
-        entscheidung_bis: toYmd(r.entscheidung),
+        probezeitgespraech_bis: r.gespraech ? toYmd(r.gespraech) : null,
+        entscheidung_bis: r.entscheidung ? toYmd(r.entscheidung) : null,
         ...(r.befristetBis ? { befristung_laufzeit_tage: r.laufTage, probezeit_anteil_prozent: anteil } : {}),
       },
       rechenweg: [
@@ -73,7 +77,7 @@ const probezeit: Werkzeug = {
         ...(azubi ? [] : [groesse === "klein"
           ? `Die Wartezeit nach § 1 KSchG endet am ${fmt(r.wartezeitEnde)}. Mit 10 oder weniger Beschäftigten gilt das KSchG aber nicht (§ 23 KSchG).`
           : `Die Wartezeit nach § 1 KSchG endet am ${fmt(r.wartezeitEnde)}, Kündigungsschutz ab ${fmt(r.kschgAb)}${groesse === "unklar" ? ", nur bei mehr als 10 Beschäftigten" : ""}.`]),
-        `Probezeitgespräch 4 Wochen vor dem Ende: bis ${fmt(r.gespraech)}. Entscheidung 2 Wochen vor dem Ende: bis ${fmt(r.entscheidung)}.`,
+        termine,
         ...(r.befristetBis ? [`Befristung bis ${fmt(r.befristetBis)}: ${r.laufTage} Tage Laufzeit, die Probezeit nimmt ${anteil} % davon ein.`] : []),
       ],
       quellen,
@@ -94,7 +98,7 @@ const probezeit: Werkzeug = {
         "Die Kündigung braucht Papier mit Originalunterschrift (§ 623 BGB). E-Mail, PDF oder Messenger reichen nicht.",
       ],
       naechster_schritt: toYmd(r.ende) > heute ? [
-        `Probezeitgespräch bis ${fmt(r.gespraech)} führen, Entscheidung bis ${fmt(r.entscheidung)} treffen.`,
+        ...(r.entscheidung ? [termine] : []),
         merken("Ende der Probezeit", toYmd(r.ende)),
       ] : [],
     }, heute);
@@ -217,7 +221,7 @@ const elternzeit_fristen: Werkzeug = {
     if ([g, b, en, z, et].some((x) => Number.isNaN(x))) return antwort({ ergebnis: { fehler: ["Eines der Daten gibt es im Kalender nicht."] }, quellen }, heute);
     const r = berechneElternzeit({
       geburt: g, et, elternteil: mutter ? "mutter" : "anderer", mutterschutz12: e.mutterschutz_12_wochen ?? false,
-      beginn: b, ende: en, zugang: z, teilzeit: e.teilzeit ?? false, urlaub: e.jahresurlaub ?? null,
+      beginn: b, ende: en, zugang: z, teilzeit: e.teilzeit ?? false, urlaub: e.jahresurlaub ?? null, heute: toDay(heute),
     });
     if (r.fehler.length) return antwort({ ergebnis: { fehler: r.fehler }, quellen, fallen: r.warnungen }, heute);
 
@@ -240,6 +244,7 @@ const elternzeit_fristen: Werkzeug = {
         antrag_frist_wochen: a0.fristWochen,
         antrag_form: textform ? "Textform, eine E-Mail reicht" : "Schriftform mit Unterschrift",
         ...(z !== null ? { antrag_rechtzeitig: !r.zuSpaet, ...(r.zuSpaet ? { beginn_fruehestens: fromDay(r.fruehesterBeginnBeiZugang!) } : {}) } : {}),
+        ...(r.fristVorbei ? { antragsfrist_vorbei: true, beginn_fruehestens: fromDay(r.fruehesterBeginnAbHeute!) } : {}),
         ...(r.abschnitte.length > 1 ? { abschnitte: r.abschnitte.map((a) => ({ von: fromDay(a.von), bis: fromDay(a.bis), frist_wochen: a.fristWochen, antrag_spaetestens: fromDay(a.spaetesterZugang) })) } : {}),
         kuendigungsschutz_ab: r.schutzAb === null ? null : fromDay(r.schutzAb),
         kuendigungsschutz_fruehestens: fromDay(a0.schutzFruehestens),
@@ -263,6 +268,7 @@ const elternzeit_fristen: Werkzeug = {
       quellen,
       fallen: [
         ...r.warnungen,
+        ...(r.fristVorbei ? [`Die Antragsfrist ist schon vorbei. Kommt der Antrag heute, beginnt die Elternzeit ohne dringenden Grund frühestens am ${fmtDay(r.fruehesterBeginnAbHeute!)}. Die Elternzeit entfällt nicht. Ihr könnt euch auch auf den Wunschtermin einigen.`] : []),
         ...(r.zuSpaet ? [`Der Antrag kam zu spät. Sicher rechtzeitig wäre ${fmtDay(a0.spaetesterZugang)} gewesen. Ohne dringenden Grund verschiebt sich der Beginn auf frühestens ${fmtDay(r.fruehesterBeginnBeiZugang!)}, die Elternzeit entfällt nicht. Ihr könnt euch auch auf den Wunschtermin einigen.`] : []),
         ...(z !== null && z < a0.schutzFruehestens ? [`Der Antrag kam früh. Der Kündigungsschutz beginnt erst ${a0.ab3 ? 14 : 8} Wochen vor der Elternzeit, also am ${fmtDay(a0.schutzFruehestens)}.`] : []),
         e.teilzeit ? "Bei Teilzeit bei dir darfst du den Urlaub nicht kürzen (§ 17 Abs. 1 Satz 2 BEEG)."
@@ -462,11 +468,11 @@ const aufbewahrungsfristen: Werkzeug = {
       }, heute);
     }
     if (!d) return ungueltig(`Es fehlt das Datum: ${typ.datum}.`);
-    const am = e.pruefung_am ? parseYmd(e.pruefung_am) : null;
-    const bis = e.pruefung_zeitraum_bis ? parseYmd(e.pruefung_zeitraum_bis) : null;
-    if (am && bis && bis > am) return ungueltig("Der geprüfte Zeitraum muss vor dem Tag der Prüfung enden.");
-    const pr = am && bis ? { bis, am } : null;
-    const f = berechneFrist(typ, d, pr);
+    const p = pruefungLesen(e.pruefung_zeitraum_bis ? parseYmd(e.pruefung_zeitraum_bis) : null, e.pruefung_am ? parseYmd(e.pruefung_am) : null);
+    if (p.fehler) return ungueltig(p.fehler);
+    const pr = p.pruefung;
+    // Verbindlich ist bei Entgeltunterlagen die spätere von SV-Frist und steuerlicher Frist (lintelly.com 28.10.2026).
+    const f = verbindlicheFrist(typ, d, pr);
     const hinweise = [...(typ.hinweis ? [typ.hinweis] : []), ...(streit ? [STREIT] : [])];
     if (!f) {
       return antwort({
@@ -481,13 +487,14 @@ const aufbewahrungsfristen: Werkzeug = {
     return antwort({
       ergebnis: { ...kopf, datum: e.datum, aufbewahren_bis: toYmd(f.bis), loeschen_ab: toYmd(f.ab), jetzt_loeschen: jetzt && !streit },
       rechenweg: [
-        `${typ.label}: ${typ.frist}.`,
-        `Fristbeginn ${typ.regel.art === "jahresende" ? `mit Ablauf des 31.12.${d.getUTCFullYear()}` : sv ? `mit Ablauf des 31.12.${pr!.am.getUTCFullYear()}, dem Jahr der Prüfung` : `am ${fmt(d)}`}. Aufbewahren bis ${fmt(f.bis)}, frühestens löschen ab ${fmt(f.ab)}.`,
+        `${typ.label}: ${f.sv ? "8 Jahre ab Ende des Kalenderjahres (als Lohnbeleg, § 147 AO)" : typ.frist}.`,
+        `Fristbeginn ${typ.regel.art === "jahresende" || f.sv ? `mit Ablauf des 31.12.${d.getUTCFullYear()}` : sv ? `mit Ablauf des 31.12.${pr!.am.getUTCFullYear()}, dem Jahr der Prüfung` : `am ${fmt(d)}`}. Aufbewahren bis ${fmt(f.bis)}, frühestens löschen ab ${fmt(f.ab)}.`,
+        ...(f.sv ? [`Nach § 28f SGB IV allein: aufbewahren bis ${fmt(f.sv.bis)}.`] : []),
       ],
       quellen,
       fallen: [
         ...hinweise,
-        ...(sv && f.ab <= h && !jetzt && !streit ? [`Ist die Unterlage zugleich Lohnbeleg, bewahrst du sie 8 Jahre ab Ende des Kalenderjahres auf, hier bis ${fmt(new Date(Date.UTC(d.getUTCFullYear() + 8, 11, 31)))} (§ 147 AO). Frag dein Lohnbüro, wie es die Unterlagen führt.`] : []),
+        ...(f.sv && !jetzt && !streit ? [`Führt dein Lohnbüro die Unterlage nicht als Lohnbeleg, gilt nur § 28f SGB IV. Dann darfst du sie ab ${fmt(f.sv.ab)} löschen. Frag dein Lohnbüro, wie es die Unterlagen führt.`] : []),
       ],
       naechster_schritt: streit ? [] : jetzt
         ? ["Lösch das Dokument jetzt, wenn keine andere Frist greift. Nach Art. 17 DSGVO müssen personenbezogene Daten gelöscht werden, wenn der Zweck entfallen ist. Denk an Kopien im Postfach und auf Laufwerken."]
