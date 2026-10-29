@@ -1,4 +1,5 @@
-// Eine Version überall: npm-Paket, server.json, Claude-Plugin, Marktplatz, Changelog (scripts/version.mjs setzt sie gemeinsam).
+// Eine Version überall, an allen Stellen, die scripts/version.mjs setzt: npm-Paket, server.json, Claude-, Agent- und Cursor-Plugin,
+// Gemini-Erweiterung, beide Marktplätze, Changelog (Review 29.10.2026: vorher 3 von 8 geprüft).
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { expect, it } from "vitest";
@@ -7,7 +8,12 @@ import { VERSION } from "../src/server";
 const W = path.resolve(import.meta.dirname, "../../..");
 const json = (f: string) => JSON.parse(readFileSync(path.join(W, f), "utf8"));
 
-it("Version gleich in Paket, server.json, Plugin, Marktplatz und Changelog", () => {
+it("Version gleich in Paket, server.json, allen Plugins, Gemini, beiden Marktplätzen und Changelog", () => {
+  expect(json("packages/mcp/package.json").version).toBe(VERSION);
+  expect(json("plugins/agent/plugin.json").version).toBe(VERSION);
+  expect(json("plugins/cursor/.cursor-plugin/plugin.json").version).toBe(VERSION);
+  expect(json(".cursor-plugin/marketplace.json").metadata.version).toBe(VERSION);
+  expect(json("gemini-extension.json").version).toBe(VERSION);
   const s = json("server.json");
   expect(s.version).toBe(VERSION);
   // npm steht erst drin, wenn das Paket veröffentlicht ist (das Registry prüft es).

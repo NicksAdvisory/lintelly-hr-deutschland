@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { ANWEISUNGEN, mcpServer } from "../src/server";
+import { WERKZEUGE } from "../src/werkzeuge";
 import { stand, zuruecksetzen } from "../src/zaehler";
 
 /** Alle 24 Werkzeuge von lintelly.com/tools und das Werkzeug, das sie hier abdeckt (Nick 23.10.2026: „alles rein“). */
@@ -76,6 +77,51 @@ describe("Werkzeuge", () => {
   });
 });
 
+describe("Eingaben und Fehler (Review 29.10.2026)", () => {
+  it("unmögliche und ferne Daten: Fehler mit klarem Text, kein Weiterrechnen", async () => {
+    const r = await client.callTool({ name: "klagefrist", arguments: { zugang: "2026-02-30" } });
+    expect(r.isError).toBe(true);
+    expect(text(r)).toEqual({ fehler: ["zugang: Den Tag 2026-02-30 gibt es im Kalender nicht."] });
+    const f = await client.callTool({ name: "abfindung_faustformel", arguments: { monatsgehalt_brutto: 4000, eintritt: "2020-01-01", austritt: "2199-12-31" } });
+    expect(text(f)).toEqual({ fehler: ["austritt: Das Jahr muss zwischen 1950 und 2100 liegen."] });
+    expect(text(await client.callTool({ name: "befristung", arguments: { beginn: "1949-12-31" } })).fehler[0]).toMatch(/1950 und 2100/);
+  });
+  it("jedes Werkzeug mit Daten rechnet am Rand 1950 und 2100 schnell und ohne Hänger", () => {
+    for (const w of WERKZEUGE) {
+      const daten = Object.entries(w.eingabe.properties).filter(([, f]) => "format" in f && f.format === "date").map(([k]) => k);
+      if (!daten.length) continue;
+      for (const tag of ["1950-01-01", "2100-12-31"]) {
+        const start = performance.now();
+        try { w.ausfuehren(Object.fromEntries(daten.map((k) => [k, tag])), "2026-10-23"); } catch { /* Fehler sind erlaubt, Hänger nicht */ }
+        expect(performance.now() - start, `${w.name} ${tag}`).toBeLessThan(500);
+      }
+    }
+  });
+  it("ganze Zahlen: Kommazahl abgelehnt, Jahr als Zahl oder als Text", async () => {
+    expect(text(await client.callTool({ name: "kuendigungsfrist_rechnen", arguments: { eintritt: "2025-01-01", zugang: "2026-10-07", probezeit_monate: 2.5 } })))
+      .toEqual({ fehler: ["probezeit_monate muss eine ganze Zahl sein."] });
+    for (const jahr of [2026, "2026"]) expect(text(await client.callTool({ name: "minijob", arguments: { jahr, stundenlohn: 15 } })).ergebnis.jahr).toBe(2026);
+  });
+  it("eine Fehlerform: isError mit Liste fehler, auch für Fehler aus der Rechnung, und jeder Fehler wird gezählt", async () => {
+    zuruecksetzen();
+    const r = await client.callTool({ name: "urlaubsabgeltung", arguments: { tage_pro_woche: 5 } });
+    expect(r.isError).toBe(true);
+    expect(text(r)).toEqual({ fehler: ["Es fehlt der Verdienst: monatsgehalt_brutto oder verdienst_13_wochen."] });
+    expect((await client.callTool({ name: "gibt_es_nicht", arguments: {} })).isError).toBe(true);
+    expect(stand().zahlen.urlaubsabgeltung.fehler).toBe(1);
+    expect(stand().zahlen.unbekanntes_werkzeug.fehler).toBe(1);
+  });
+  it("outputSchema an jedem Werkzeug, structuredContent gleich dem JSON-Text", async () => {
+    for (const t of (await client.listTools()).tools) expect(t.outputSchema?.required, t.name).toContain("ergebnis");
+    const r = await client.callTool({ name: "rechtswert", arguments: { kennung: "mindestlohn" } });
+    expect(r.structuredContent).toEqual(text(r));
+  });
+  it("unbekannter Prompt und unbekannte Ressource: ungültige Angabe statt interner Fehler", async () => {
+    await expect(client.getPrompt({ name: "gibt_es_nicht" })).rejects.toMatchObject({ code: -32602 });
+    await expect(client.readResource({ uri: "lintelly-hr://gibt-es-nicht" })).rejects.toMatchObject({ code: -32602 });
+  });
+});
+
 describe("Prompts, Ressourcen, Anweisungen", () => {
   it("vier Prompts wie im Plan", async () => {
     const p = (await client.listPrompts()).prompts.map((x) => x.title);
@@ -90,8 +136,9 @@ describe("Prompts, Ressourcen, Anweisungen", () => {
     const inhalt = await client.readResource({ uri: "lintelly-hr://rechtswerte" });
     expect(JSON.parse((inhalt.contents[0] as { text: string }).text).werte).toHaveLength(217);
   });
-  it("Lintelly steht in den Anweisungen genau einmal als Herausgeber", () => {
+  it("Lintelly steht in den Anweisungen genau einmal als Herausgeber, ohne Werbung", () => {
     expect(ANWEISUNGEN.match(/Herausgeber ist Lintelly/g)).toHaveLength(1);
+    expect(ANWEISUNGEN).not.toMatch(/eigener Software|ab 10 Beschäftigten/);
   });
 });
 

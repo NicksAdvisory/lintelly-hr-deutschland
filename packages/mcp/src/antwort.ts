@@ -11,7 +11,6 @@ export const HINWEIS = "Allgemeine Auskunft, keine Rechtsberatung im Einzelfall.
 
 export type Quelle = { norm: string; url?: string | null; geprueft_am?: string | null; status?: "bestätigt" | "noch nicht bestätigt" | "Prüfung überfällig" };
 
-
 export type Antwort = {
   ergebnis: unknown;
   rechenweg?: string[];
@@ -25,6 +24,40 @@ export type Antwort = {
 
 export type AntwortTeile = Omit<Antwort, "hinweis" | "stand" | "herausgeber" | "quellen"> & { quellen?: Quelle[] };
 
+/** Antwortform für outputSchema und structuredContent: dieselben Felder wie im JSON-Text, ergebnis je Werkzeug verschieden. */
+const texte = { type: "array", items: { type: "string" } } as const;
+export const ANTWORT_SCHEMA = {
+  type: "object",
+  properties: {
+    ergebnis: { description: "Result of the tool; its fields differ per tool" },
+    rechenweg: texte,
+    quellen: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: { norm: { type: "string" }, url: { type: ["string", "null"] }, geprueft_am: { type: ["string", "null"] }, status: { type: "string", enum: ["bestätigt", "noch nicht bestätigt", "Prüfung überfällig"] } },
+        required: ["norm"],
+      },
+    },
+    fallen: texte,
+    naechster_schritt: texte,
+    hinweis: { type: "string" },
+    stand: { type: "string" },
+    herausgeber: { type: "string" },
+  },
+  required: ["ergebnis", "quellen", "hinweis", "stand", "herausgeber"],
+} as const;
+
+/** Eingabe, mit der ein Werkzeug nicht rechnen kann. Der Server antwortet dann wie bei jedem Fehler: isError und { fehler: [...] }. */
+export class Fehler extends Error {
+  constructor(readonly meldungen: string[]) {
+    super(meldungen.join(" "));
+  }
+}
+export function fehler(...meldungen: string[]): never {
+  throw new Fehler(meldungen);
+}
+
 /** Baut die Antwort. `heute` ist der Tag des Aufrufs (Berlin), gegen ihn wird „Prüfung überfällig“ gesetzt. */
 export function antwort(t: AntwortTeile, heute: string): Antwort {
   const { quellen = [], ...rest } = t;
@@ -32,16 +65,37 @@ export function antwort(t: AntwortTeile, heute: string): Antwort {
   const ohneLeere = Object.fromEntries(Object.entries(rest).filter(([, v]) => !leer(v))) as Omit<Antwort, "hinweis" | "stand" | "herausgeber" | "quellen">;
   return {
     ...ohneLeere,
-    quellen: eindeutig(quellen),
+    quellen: eindeutig(quellen.map((q) => ausRegister(q, heute))),
     hinweis: HINWEIS,
     stand: heute,
     herausgeber: HERAUSGEBER,
   };
 }
 
-const eindeutig = (q: Quelle[]) => q.filter((x, i) => q.findIndex((y) => y.norm === x.norm && y.url === x.url) === i);
+const ohneKlammer = (n: string) => n.replace(/\s*\([^)]*\)/g, "").trim();
+const allgemein = (n: string) => ohneKlammer(n).replace(/ (Abs\.|Satz|Nr\.) \S+/g, "");
+/**
+ * Doppelte Quellen fallen weg (Review 29.10.2026): dieselbe Norm mit derselben Fundstelle, auch mit Zusatz in Klammern
+ * („§ 1 MiLoV5“ neben „§ 1 MiLoV5 (vorher MiLoV4)“), und die allgemeine Norm neben der genaueren („§ 1 AAG“ neben „§ 1 Abs. 1 AAG“).
+ * Eine Quelle mit Prüfstatus geht vor, sonst die erste.
+ */
+const eindeutig = (q: Quelle[]) => q.filter((x, i) => !q.some((y, j) => {
+  if (j === i || y.url !== x.url || (!!x.status && !y.status)) return false;
+  return ohneKlammer(y.norm) === ohneKlammer(x.norm) ? !!y.status !== !!x.status || j < i : allgemein(y.norm) === ohneKlammer(x.norm);
+}));
 
 const EINTRAG: Record<string, RegisterEintrag> = Object.fromEntries(REGISTER.map((e) => [e.id, e]));
+/** Register-Kennungen je Norm, ohne die eigenen Annahmen von Lintelly. */
+const NACH_NORM = REGISTER.filter((e) => e.rhythmus !== "Lintelly").reduce((m, e) => m.set(ohneKlammer(e.norm), [...(m.get(ohneKlammer(e.norm)) ?? []), e.id]), new Map<string, string[]>());
+const RANG = { "Prüfung überfällig": 0, "noch nicht bestätigt": 1, bestätigt: 2 } as const;
+
+/** Steht die Norm im Register, bekommt die Quelle Prüfdatum und Status, bei mehreren Einträgen den schwächsten (README: für jede Quelle). */
+function ausRegister(q: Quelle, heute: string): Quelle {
+  const ids = q.status ? undefined : NACH_NORM.get(ohneKlammer(q.norm));
+  if (!ids) return q;
+  const r = ids.map((id) => registerQuelle(id, heute)).sort((a, b) => RANG[a.status!] - RANG[b.status!])[0];
+  return { ...q, url: q.url ?? r.url, geprueft_am: r.geprueft_am, status: r.status };
+}
 
 /** Quelle aus dem Rechtswerte-Register: Norm, amtliche Fundstelle, Prüfdatum und Status. Überschrittene Prüfung wird genannt. */
 export function registerQuelle(id: string, heute: string): Quelle {

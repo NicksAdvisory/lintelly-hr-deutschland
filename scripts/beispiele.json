@@ -14,7 +14,7 @@
   "sofortmeldepflicht": { "branche": "gastro" },
   "frist_merken": { "datum": "2027-05-31", "frist": "Ende der Probezeit" },
   "entgeltfortzahlung": { "beginn": "2025-01-01", "zeitraeume": [{ "von": "2026-10-02", "bis": "2026-10-23" }] },
-  "urlaubsabgeltung": { "eintritt": "2025-01-01", "austritt": "2026-12-31", "jahresurlaub": 25, "tage_pro_woche": 5, "schon_genommen": 20 },
+  "urlaubsabgeltung": { "eintritt": "2025-01-01", "austritt": "2026-12-31", "jahresurlaub": 25, "tage_pro_woche": 5, "schon_genommen": 20, "monatsgehalt_brutto": 3500 },
   "abfindung_faustformel": { "monatsgehalt_brutto": 4000, "eintritt": "2024-10-01", "austritt": "2026-12-31" },
   "ausgleichsabgabe": { "jahr": "2026", "arbeitsplaetze": [25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25], "schwerbehinderte": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
   "minijob": { "stundenlohn": 14, "stunden": 10, "stunden_je": "woche" },

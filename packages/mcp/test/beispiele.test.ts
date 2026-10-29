@@ -1,4 +1,4 @@
-// Jedes Werkzeug hat ein Beispiel für den Rauchtest (scripts/beispiele.json), und das Beispiel rechnet ohne Fehler.
+// Jedes Werkzeug hat ein Beispiel für den Rauchtest (scripts/beispiele.json), und das Beispiel rechnet ohne Fehler und ohne Feld fehler.
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { expect, it } from "vitest";
@@ -13,5 +13,6 @@ it("jedes Werkzeug hat ein Beispiel, jedes Beispiel ein Werkzeug", () => {
 it.each(Object.entries(BEISPIELE))("%s rechnet mit dem Beispiel, ohne Gedankenstrich", (name, eingabe) => {
   const a = rufe(name, eingabe);
   expect(a.herausgeber).toBe("Lintelly, lintelly.com");
+  expect(a.ergebnis, name).not.toHaveProperty("fehler");
   expect(JSON.stringify(a)).not.toMatch(/[–—]/);
 });

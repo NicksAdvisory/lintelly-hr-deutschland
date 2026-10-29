@@ -17,17 +17,27 @@ const text = (r: any) => JSON.parse(r.content[0].text);
 describe("nur Deutschland", () => {
   it("Anweisungen und jede Werkzeugbeschreibung sagen Germany only", async () => {
     expect(ANWEISUNGEN).toMatch(/nur deutsches Arbeits- und Sozialversicherungsrecht/);
-    for (const t of (await client.listTools()).tools) expect(t.description, t.name).toMatch(/^Germany only\./);
+    // Genau einmal je Beschreibung (Review 29.10.2026: 26 von 38 sagten es zweimal)
+    for (const t of (await client.listTools()).tools) expect(t.description!.split("Germany only").length - 1, t.name).toBe(1);
   });
   it("Frage nach Österreich: Hinweis statt Rechnung", async () => {
     const a = text(await client.callTool({ name: "rechtswerte_suchen", arguments: { suchtext: "Mindestlohn Österreich" } }));
     expect(a.ergebnis).toEqual({ hinweis: NUR_DEUTSCHLAND });
     expect(NUR_DEUTSCHLAND).toBe("Lintelly HR kennt nur deutsches Arbeits- und Sozialversicherungsrecht.");
   });
-  it("Schweiz und Switzerland im Klauseltext ebenso", async () => {
-    for (const k of ["Kündigungsfrist nach Schweizer OR", "notice period in Switzerland"]) {
-      expect(text(await client.callTool({ name: "klausel_pruefen", arguments: { klausel: k } })).ergebnis).toEqual({ hinweis: NUR_DEUTSCHLAND });
+  it("Schweiz und Switzerland in einer kurzen Suche ebenso", async () => {
+    for (const k of ["Kündigungsfrist Schweizer OR", "notice period Switzerland"]) {
+      expect(text(await client.callTool({ name: "vertragsbausteine_suchen", arguments: { suchtext: k } })).ergebnis).toEqual({ hinweis: NUR_DEUTSCHLAND });
     }
+  });
+  it("Freitext darf Länder nennen: Klausel mit Gebiet DACH und Stellenanzeige mit Straßennamen werden geprüft (Review 29.10.2026)", async () => {
+    const klausel = "Der Arbeitnehmer verpflichtet sich, für zwei Jahre nach dem Ende in Deutschland, Österreich und der Schweiz nicht für einen Wettbewerber tätig zu werden.";
+    const k = await client.callTool({ name: "klausel_pruefen", arguments: { klausel } });
+    expect(k.isError).toBeFalsy();
+    expect(text(k).ergebnis).toHaveProperty("einordnung");
+    const s = text(await client.callTool({ name: "stellenanzeige_check", arguments: { anzeigentext: "Wir suchen eine Bürokraft (m/w/d) für unser Büro in der Rosa-Luxemburg-Straße 5, Berlin. Ein junges Team freut sich auf dich." } }));
+    expect(s.ergebnis.hinweis).toBeUndefined();
+    expect(JSON.stringify(s.ergebnis)).toMatch(/Alter/);
   });
   it("deutsche Fragen laufen normal", async () => {
     expect(text(await client.callTool({ name: "rechtswerte_suchen", arguments: { suchtext: "Mindestlohn" } })).ergebnis.treffer.length).toBeGreaterThan(0);
