@@ -1,10 +1,11 @@
 /**
  * Arbeitgeberkosten, Mindestlohn, Sofortmeldung und „Frist merken“. Sätze und Grenzen aus dem Rechtswerte-Register der Werkbank
- * (lib/regeln/werte.ts), der Minijob mit dem Rechner von lintelly.com. Im Übergangsbereich (Midijob) rechnet Lintelly wie die
- * Werkbank keinen Arbeitgeberanteil, sondern nennt nur die Untergrenze: nicht berechnet statt falsch.
+ * (lib/regeln/werte.ts), der Minijob mit dem Rechner von lintelly.com. Im Übergangsbereich (Midijob) rechnet lib/regeln/midijob.ts
+ * der Werkbank den genauen Arbeitgeberanteil mit Faktor F. Ohne amtlichen Faktor F für das Jahr bleibt es bei der Untergrenze: nicht berechnet statt falsch.
  */
 import { BBG_KV_MONAT, BBG_RV_MONAT, MINIJOB_GRENZE, SATZ_AV, SATZ_KV_PV, SATZ_RV_AV, WERTE, wertZu, type WertZuDatum } from "@/lib/regeln/werte";
 import { mindestlohnLuecke } from "@/lib/regeln/mindestlohn";
+import { midijob } from "@/lib/regeln/midijob";
 import { euro as euroDin } from "@/lib/format";
 import { SOFORTMELDUNG_BEREICHE, SOFORTMELDUNG_QUELLE } from "@/lib/sofortmeldung";
 import { VORLAGE_EINTRITT } from "@/lib/module/plaene";
@@ -39,7 +40,7 @@ const arbeitgeberkosten: Werkzeug = {
   name: "arbeitgeberkosten",
   titel: "Was kostet mich eine Person",
   beschreibung:
-    "Employer costs (Arbeitgeberkosten) of one employee in Germany per month and year: gross pay plus the employer share of social security (Sozialversicherung) for full-time, part-time, working students (Werkstudent) and mini-jobs (Minijob), with rates, contribution ceilings and sources. In the transition zone (Midijob, Übergangsbereich) it gives only the lower bound instead of guessing.",
+    "Employer costs (Arbeitgeberkosten) of one employee in Germany per month and year: gross pay plus the employer share of social security (Sozialversicherung) for full-time, part-time, working students (Werkstudent) and mini-jobs (Minijob), with rates, contribution ceilings and sources. In the transition zone (Midijob, Übergangsbereich) it calculates the exact employer share with the official factor F, or only the lower bound for years whose factor F is not yet published.",
   eingabe: schema({
     art: text("Type of employment", { enum: ["vollzeit", "teilzeit", "werkstudent", "minijob"] }),
     brutto_monat: zahl("Gross pay per month in euro", 0, 100000),
@@ -112,13 +113,28 @@ const arbeitgeberkosten: Werkzeug = {
     if (brutto <= grenze.wert) {
       return antwort({ ergebnis: { art, brutto_monat: brutto, stichtag: tag, summe_arbeitgeber: null }, fallen: [`Bis ${euro(grenze.wert)} im Monat ist das ein Minijob. Rechne mit art minijob.`], quellen: [registerQuelle("minijobGrenze", heute)] }, heute);
     }
+    const mj = brutto <= ober && art !== "werkstudent" ? midijob(brutto, tag) : null;
+    if (mj?.berechnet) {
+      const mp = mj.zweige.map((z) => ({ name: `${z.zweig} (Arbeitgeberanteil im Übergangsbereich)`, satz: z.satz, betrag: z.arbeitgeber }));
+      return antwort({
+        ergebnis: { art, brutto_monat: brutto, stichtag: tag, uebergangsbereich: true, faktor_f: mj.faktorF, posten: mp, summe_arbeitgeber: mj.arbeitgeber, anteil_person: mj.arbeitnehmer,
+          gesamtkosten_monat: cent(brutto + mj.arbeitgeber), gesamtkosten_jahr: cent((brutto + mj.arbeitgeber) * 12) },
+        rechenweg: mj.rechenweg,
+        quellen: [registerQuelle("faktorF", heute), ...quellen, registerQuelle("minijobGrenze", heute)],
+        fallen: [
+          `${euro(brutto)} liegt im Übergangsbereich (Midijob, über ${euro(grenze.wert)} bis ${euro(ober)}): Die Person zahlt weniger, der Arbeitgeber mehr als den regulären Anteil (§ 20 Abs. 2a SGB IV).`,
+          ...mj.hinweise, NICHT_DRIN, ...vorlaeufig([["Minijob-Grenze", grenze]]),
+        ],
+      }, heute);
+    }
     if (brutto <= ober) {
       return antwort({
         ergebnis: { art, brutto_monat: brutto, stichtag: tag, uebergangsbereich: true, summe_arbeitgeber: null, mindestens_arbeitgeber: cent(p.reduce((s, x) => s + x.betrag, 0)), posten_regulaer: p },
         rechenweg: ["Regulärer Arbeitgeberanteil als Untergrenze:", ...rechenweg],
-        quellen: [...quellen, registerQuelle("minijobGrenze", heute)],
+        quellen: [...quellen, registerQuelle("minijobGrenze", heute), registerQuelle("faktorF", heute)],
         fallen: [
-          `${euro(brutto)} liegt im Übergangsbereich (Midijob, über ${euro(grenze.wert)} bis ${euro(ober)}). Die Beiträge folgen einer eigenen Formel (§ 20 Abs. 2a SGB IV): Der Arbeitgeber zahlt mehr als den regulären Anteil, je näher an der Minijob-Grenze, desto mehr. Bei ${euro(ober)} gilt der reguläre Anteil. Die genaue Zahl rechnet das Lohnbüro.`,
+          `${euro(brutto)} liegt im Übergangsbereich (Midijob, über ${euro(grenze.wert)} bis ${euro(ober)}). Die Beiträge folgen einer eigenen Formel (§ 20 Abs. 2a SGB IV): Der Arbeitgeber zahlt mehr als den regulären Anteil, je näher an der Minijob-Grenze, desto mehr. Bei ${euro(ober)} gilt der reguläre Anteil.`,
+          ...(mj && !mj.berechnet ? [`Genauer Anteil nicht berechnet: ${mj.grund}`] : []),
           NICHT_DRIN, ...vorlaeufig([["Beitragssatz Kranken- und Pflegeversicherung", kvpv], ["Beitragssatz Renten- und Arbeitslosenversicherung", rvav], ["Beitragsbemessungsgrenze Kranken- und Pflegeversicherung", bbgKv], ["Beitragsbemessungsgrenze Rentenversicherung", bbgRv], ["Minijob-Grenze", grenze]]),
         ],
       }, heute);

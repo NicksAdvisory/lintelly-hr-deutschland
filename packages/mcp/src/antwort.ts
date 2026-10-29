@@ -3,13 +3,14 @@
  * Hinweis „Allgemeine Auskunft“, Herausgeber. Kein Hinweis auf Lintelly-Angebote in den
  * Antworten (Anthropic-Verzeichnis, Nick 25.10.2026).
  */
-import { REGISTER, type RegisterEintrag } from "@/lib/regeln/register";
+import { GRUND_TEXT, REGISTER, type RegisterEintrag } from "@/lib/regeln/register";
 import { normLink } from "@/lib/regeln/fundstellen";
 
 export const HERAUSGEBER = "Lintelly, lintelly.com";
 export const HINWEIS = "Allgemeine Auskunft, keine Rechtsberatung im Einzelfall.";
 
-export type Quelle = { norm: string; url?: string | null; geprueft_am?: string | null; status?: "bestätigt" | "noch nicht bestätigt" | "Prüfung überfällig" };
+/** grund: warum ein Wert nicht bestätigt ist, Text aus GRUND_TEXT des Registers (statt pauschal „noch nicht bestätigt“). */
+export type Quelle = { norm: string; url?: string | null; geprueft_am?: string | null; status?: "bestätigt" | "noch nicht bestätigt" | "Prüfung überfällig"; grund?: string };
 
 export type Antwort = {
   ergebnis: unknown;
@@ -35,7 +36,7 @@ export const ANTWORT_SCHEMA = {
       type: "array",
       items: {
         type: "object",
-        properties: { norm: { type: "string" }, url: { type: ["string", "null"] }, geprueft_am: { type: ["string", "null"] }, status: { type: "string", enum: ["bestätigt", "noch nicht bestätigt", "Prüfung überfällig"] } },
+        properties: { norm: { type: "string" }, url: { type: ["string", "null"] }, geprueft_am: { type: ["string", "null"] }, status: { type: "string", enum: ["bestätigt", "noch nicht bestätigt", "Prüfung überfällig"] }, grund: { type: "string" } },
         required: ["norm"],
       },
     },
@@ -94,7 +95,7 @@ function ausRegister(q: Quelle, heute: string): Quelle {
   const ids = q.status ? undefined : NACH_NORM.get(ohneKlammer(q.norm));
   if (!ids) return q;
   const r = ids.map((id) => registerQuelle(id, heute)).sort((a, b) => RANG[a.status!] - RANG[b.status!])[0];
-  return { ...q, url: q.url ?? r.url, geprueft_am: r.geprueft_am, status: r.status };
+  return { ...q, url: q.url ?? r.url, geprueft_am: r.geprueft_am, status: r.status, ...(r.grund ? { grund: r.grund } : {}) };
 }
 
 /** Quelle aus dem Rechtswerte-Register: Norm, amtliche Fundstelle, Prüfdatum und Status. Überschrittene Prüfung wird genannt. */
@@ -102,7 +103,7 @@ export function registerQuelle(id: string, heute: string): Quelle {
   const e = EINTRAG[id];
   if (!e) throw new Error(`Unbekannter Rechtswert: ${id}`);
   const status = e.naechstePruefung < heute ? "Prüfung überfällig" : e.status === "bestätigt" ? "bestätigt" : "noch nicht bestätigt";
-  return { norm: e.norm, url: e.quelleUrl, geprueft_am: e.geprueftAm, status };
+  return { norm: e.norm, url: e.quelleUrl, geprueft_am: e.geprueftAm, status, ...(e.grund ? { grund: GRUND_TEXT[e.grund] } : {}) };
 }
 
 /** Quelle als Norm. Ohne Link sucht normLink die amtliche Fundstelle, geraten wird keine. */

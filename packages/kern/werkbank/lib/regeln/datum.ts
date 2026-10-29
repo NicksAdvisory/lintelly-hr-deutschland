@@ -13,7 +13,7 @@
  * § 193 BGB (Verschiebung auf den nächsten Werktag) gilt für Kündigungsfristen nicht.
  */
 
-import { FEIERTAGE, fristText, jahreTextDativ, monateText, WERTE, type FeiertagRegel } from "./werte";
+import { FEIERTAGE, feiertagGiltIm, fristText, jahreTextDativ, monateText, WERTE, type FeiertagRegel } from "./werte";
 
 /** Datum als "JJJJ-MM-TT". */
 export type ISODate = string;
@@ -143,7 +143,7 @@ export function bundesFeiertag(d: ISODate): string | null {
 /** Name des Feiertags aus einer Liste des Registers (fest oder ab Ostersonntag), sonst null. */
 function feiertagAus(tage: readonly FeiertagRegel[], d: ISODate): string | null {
   const y = parts(d).y;
-  return tage.find((t) => (t.ab === undefined || y >= t.ab) && feiertagDatum(t, y) === d)?.name ?? null;
+  return tage.find((t) => feiertagGiltIm(t, y) && feiertagDatum(t, y) === d)?.name ?? null;
 }
 
 /** Datum eines Feiertags im Jahr y. Buß- und Bettag: der Mittwoch vor dem 23. November. */
@@ -162,7 +162,7 @@ export type Bundesland = keyof typeof FEIERTAGE.laender;
 export const BUNDESLAENDER = Object.fromEntries((Object.keys(FEIERTAGE.laender) as Bundesland[]).map((l) => [l, land(l)])) as Record<Bundesland, ReturnType<typeof land>>;
 function land(l: Bundesland) {
   const { name, quelle, url, tage } = FEIERTAGE.laender[l];
-  return { name, quelle, url, zusaetzlich: (y: number) => tage.filter((t) => t.ab === undefined || y >= t.ab).map((t) => ({ datum: feiertagDatum(t, y), name: t.name })) };
+  return { name, quelle, url, zusaetzlich: (y: number) => tage.filter((t) => feiertagGiltIm(t, y)).map((t) => ({ datum: feiertagDatum(t, y), name: t.name })) };
 }
 /** Land der Demo-Firma Nordhang (Sitz Frankfurt am Main). Nur die Demo nutzt es, im Echtbetrieb gibt es keinen Rückfall. */
 export const DEMO_BUNDESLAND: Bundesland = "HE";

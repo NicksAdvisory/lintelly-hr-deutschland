@@ -19,13 +19,13 @@ if (pruefen && !(existsSync(WERKBANK) && existsSync(WEBSITE))) {
 
 const AUS_WERKBANK = [
   "lib/types.ts", "lib/format.ts", "lib/heute.ts", "lib/sofortmeldung.ts", "lib/dokumente/englisch.ts",
-  ...["datum", "werte", "register", "rechtszahlen", "fundstellen", "mindestlohn", "dienstwagen", "dienstrad"].map((f) => `lib/regeln/${f}.ts`),
+  ...["datum", "werte", "register", "rechtszahlen", "fundstellen", "mindestlohn", "midijob", "dienstwagen", "dienstrad"].map((f) => `lib/regeln/${f}.ts`),
   ...["allgemein", "empfehlung", "gruppe-a", "gruppe-bc", "gruppe-d-fest", "gruppe-d-variabel", "gruppe-efgh", "gruppe-ijk", "gruppe-lmn",
     "gruppe-opqs", "hilfen", "katalog", "provision", "pruefen", "rot", "typen", "kanzlei", "eingabe"].map((f) => `lib/vertragsbausteine/${f}.ts`),
   ...["kern", "vorlagen", "anzeige", "bauen"].map((f) => `lib/workflows/${f}.ts`),
   "lib/module/plaene.ts",
-  ...["running-list-a15", "umbau-29-dienstwagen-rechner", "workflow-kern", "workflow-vorlagen"].map((f) => `tests/${f}.test.ts`),
-  ...["hilfe.ts", "allgemein.test.ts", "gruppe-a-c.test.ts", "gruppe-d.test.ts", "gruppe-e-k.test.ts", "gruppe-l-s.test.ts", "provision.test.ts"]
+  ...["running-list-a15", "umbau-29-dienstwagen-rechner", "workflow-kern", "workflow-vorlagen", "midijob"].map((f) => `tests/${f}.test.ts`),
+  ...["hilfe.ts", "allgemein.test.ts", "gruppe-a-c.test.ts", "gruppe-d.test.ts", "gruppe-e-k.test.ts", "gruppe-l-s.test.ts", "provision.test.ts", "rote-liste.test.ts"]
     .map((f) => `tests/vertragsbausteine/${f}`),
 ];
 const AUS_WEBSITE = [

@@ -7,14 +7,31 @@
  * Wert nicht im Wortlaut gefunden, eigene Lintelly-Annahme oder in werte.ts als unbestätigt markiert. Keine Rechtsberatung.
  */
 import {
-  AUFBEWAHRUNG, AUFBEWAHRUNG_MODULE, AUSSTEHEND, BBG_KV_MONAT, DIENSTWAGEN_BATTERIEABZUG_BIS, DIENSTWAGEN_BRUCHTEIL, BBG_RV_MONAT, DRV_RECHENGROESSEN_2027, FEIERTAGE,
-  MINDESTAUSBILDUNG, MINDESTLOHN, MINIJOB_AG_PAUSCHALE, MINIJOB_GRENZE, SACHBEZUG_MITTAG, SATZ_AV, SATZ_KV_PV, SATZ_RV_AV, WERTE, type ZeitWert,
+  AUFBEWAHRUNG, AUFBEWAHRUNG_MODULE, AUSSTEHEND, BBG_KV_MONAT, DIENSTWAGEN_BATTERIEABZUG_BIS, DIENSTWAGEN_BRUCHTEIL, BBG_RV_MONAT, DRV_RECHENGROESSEN_2027, FAKTOR_F, FEIERTAGE,
+  MINDESTAUSBILDUNG, MINDESTLOHN, MINIJOB_AG_PAUSCHALE, MINIJOB_GRENZE, SACHBEZUG_MITTAG, SATZ_AV, SATZ_KV_PV, SATZ_RV_AV, WERTE, type FeiertagRegel, type ZeitWert,
 } from "./werte";
 import { anteil, euro, zahl as dezimal } from "@/lib/format";
 import { BAG, EU_DSGVO, gii } from "./fundstellen";
 import { addMonths } from "./datum";
 
 export type Status = "bestätigt" | "Kanzlei prüfen";
+/**
+ * Warum ein Eintrag auf "Kanzlei prüfen" steht (bei "bestätigt" null). Von Hand gesetzt: Umrechnung, Aufbewahrung, Auslegung, Lintelly-Standard,
+ * vorläufig, Link tot. Sonst abgeleitet: keine Quelle, Auslegung (k ohne eigenen Grund), Freigabe offen (Prüfdatum, aber werte.ts bestaetigt: false), nie geprüft.
+ * Ändert den Status nicht, erklärt ihn nur (Texte fürs MCP und die Seite Rechtswerte: GRUND_TEXT).
+ */
+export type Grund = "Auslegung" | "Lintelly-Standard" | "Umrechnung" | "Aufbewahrung" | "vorläufig" | "keine Quelle" | "Freigabe offen" | "nie geprüft" | "Link tot";
+export const GRUND_TEXT: Record<Grund, string> = {
+  Auslegung: "Auslegung der Rechtsprechung oder des Gesetzes, Prüfung durch die Kanzlei offen",
+  "Lintelly-Standard": "Lintelly-Standard, kein Gesetzeswert",
+  Umrechnung: "Gesetz nennt einen anderen Bezug, Umrechnung durch Lintelly, Kanzlei prüft",
+  Aufbewahrung: "Gesetz nennt keine feste Frist, die Kanzlei legt sie fest",
+  vorläufig: "Wert für das Folgejahr noch nicht amtlich verkündet",
+  "keine Quelle": "Keine amtliche Fundstelle",
+  "Freigabe offen": "Wortlaut geprüft, Freigabe durch die Kanzlei offen",
+  "nie geprüft": "Noch nicht im amtlichen Wortlaut geprüft",
+  "Link tot": "Amtliche Fundstelle derzeit nicht erreichbar",
+};
 /** Wie sich ein Wert ändert: jährlich per Verordnung oder Bekanntmachung, per Gesetz, durch Urteile, durch Verwaltung (Rundschreiben, DGUV, ASR) oder durch eine Entscheidung von Lintelly. */
 export type Rhythmus = "jährlich" | "Gesetz" | "Rechtsprechung" | "Verwaltung" | "Lintelly";
 export type Gebiet =
@@ -22,8 +39,11 @@ export type Gebiet =
   | "Arbeitszeit" | "Arbeitsschutz" | "Datenschutz und Hinweisgeber" | "Lohn und Sozialversicherung" | "Ausbildung und Werkstudium"
   | "Freelancer" | "Entgelttransparenz" | "Schwellenwerte" | "Aufbewahrung" | "Feiertage" | "Abläufe von Lintelly"
   | "Vergütung und Provision" | "Wettbewerb und Vertragsstrafe" | "Erfindungen und Urheberrecht";
-/** `ausstehend`: Folgejahr ohne amtlichen Wert, die Zeile nennt nur Quelle und erwarteten Termin (werte.ts AUSSTEHEND). */
-export type Zeitwert = { gueltigAb: string | null; gueltigBis: string | null; wert: string; ausstehend?: true };
+/**
+ * `ausstehend`: Folgejahr ohne amtlichen Wert, die Zeile nennt nur Quelle und erwarteten Termin (werte.ts AUSSTEHEND).
+ * `rotAb`: eigener Tag, ab dem der ausstehende Wert als fehlend gilt, wenn die Bekanntgabe gesetzlich später kommt als der Prüftermin 15.11.
+ */
+export type Zeitwert = { gueltigAb: string | null; gueltigBis: string | null; wert: string; ausstehend?: true; rotAb?: string };
 export type RegisterEintrag = {
   id: string; titel: string; gebiet: Gebiet; norm: string; quelleUrl: string | null; hinweis: string;
   /** Weitere amtliche Seiten, auf denen der Rest der Zahlen steht (die monatliche Prüfung sucht über alle Fundstellen). */
@@ -32,6 +52,8 @@ export type RegisterEintrag = {
   pruefzahlen?: string[];
   werte: Zeitwert[]; rhythmus: Rhythmus; stichtag: string | null;
   geprueftAm: string | null; naechstePruefung: string; status: Status;
+  /** Grund für "Kanzlei prüfen", bei "bestätigt" null. */
+  grund: Grund | null;
 };
 
 /** Tag, an dem das Register angelegt wurde. Ohne Prüfdatum rechnet die nächste Prüfung ab hier. */
@@ -46,6 +68,8 @@ export const ERLAUBTE_DOMAINS = [
   "landesrecht-bw.de", "bravors.brandenburg.de", "transparenz.bremen.de", "landesrecht-hamburg.de", "landesrecht-mv.de", "landtag-niedersachsen.de",
   "recht.nrw.de", "landesrecht.rlp.de", "recht.saarland.de", "revosax.sachsen.de", "landesrecht.sachsen-anhalt.de", "gesetze-rechtsprechung.sh.juris.de",
   "landesrecht.thueringen.de",
+  // Niedersächsisches Vorschrifteninformationssystem NI-VORIS (amtliches Landesportal, betrieben von Wolters Kluwer)
+  "voris.wolterskluwer-online.de",
 ];
 
 export function erlaubteQuelle(url: string): boolean {
@@ -96,10 +120,13 @@ export const baldFaellig = (register: RegisterEintrag[], heute: string, tage = V
 };
 
 /** Jährliche Einträge ohne Wert für das Folgejahr, ab dem 1. November. */
-function ohneFolgejahr(register: RegisterEintrag[], heute: string): { e: RegisterEintrag; ausstehend: boolean }[] {
+function ohneFolgejahr(register: RegisterEintrag[], heute: string): { e: RegisterEintrag; ausstehend: boolean; rot: boolean }[] {
   if (heute.slice(5) < "11-01") return [];
   const folgejahr = `${Number(heute.slice(0, 4)) + 1}-01-01`;
-  return register.filter((e) => e.rhythmus === "jährlich" && !wertAm(e, folgejahr)).map((e) => ({ e, ausstehend: e.werte.some((w) => w.ausstehend && gilt(w, folgejahr)) }));
+  return register.filter((e) => e.rhythmus === "jährlich" && !wertAm(e, folgejahr)).map((e) => {
+    const offen = e.werte.find((w) => w.ausstehend && gilt(w, folgejahr));
+    return { e, ausstehend: !!offen, rot: !offen || (offen.rotAb ? heute >= offen.rotAb : nachPruefTermin(heute)) };
+  });
 }
 const nachPruefTermin = (heute: string) => heute.slice(5) > `${String(JAEHRLICH_PRUEFUNG.monat).padStart(2, "0")}-${String(JAEHRLICH_PRUEFUNG.tag).padStart(2, "0")}`;
 /**
@@ -107,11 +134,13 @@ const nachPruefTermin = (heute: string) => heute.slice(5) > `${String(JAEHRLICH_
  * (amtliche Bekanntgabe steht noch aus), zählt er erst nach dem Prüftermin 15.11. als fehlend; bis dahin warnt `ausstehendeFolgejahre`.
  */
 export function fehlendeFolgejahre(register: RegisterEintrag[], heute: string): RegisterEintrag[] {
-  return ohneFolgejahr(register, heute).filter((x) => !x.ausstehend || nachPruefTermin(heute)).map((x) => x.e);
+  // Dazu: ein ausstehender Wert, dessen Jahr schon begonnen hat (z. B. Faktor F am 01.01. noch nicht eingetragen).
+  const begonnen = register.filter((e) => e.werte.some((w) => w.ausstehend && gilt(w, heute)) && !wertAm(e, heute));
+  return [...new Set([...ohneFolgejahr(register, heute).filter((x) => x.rot).map((x) => x.e), ...begonnen])];
 }
 /** Folgejahreswerte, die bis zur amtlichen Bekanntgabe ausstehen dürfen (Warnung, kein Fehler). */
 export function ausstehendeFolgejahre(register: RegisterEintrag[], heute: string): RegisterEintrag[] {
-  return nachPruefTermin(heute) ? [] : ohneFolgejahr(register, heute).filter((x) => x.ausstehend).map((x) => x.e);
+  return ohneFolgejahr(register, heute).filter((x) => x.ausstehend && !x.rot).map((x) => x.e);
 }
 
 /* ------------------------------------------------------------------ */
@@ -150,16 +179,17 @@ export function wertText(v: unknown): string {
 /* Angaben je Wert                                                     */
 /* ------------------------------------------------------------------ */
 
-/** p: Prüfdatum, k: Kanzlei prüfen, ab/bis: Gültigkeit, befund: was beim Lesen der Quelle auffiel (der Wert bleibt, bis Nick und die Kanzlei entscheiden). */
-type Optionen = { p?: string; k?: true; ab?: string; bis?: string; stichtag?: string; befund?: string };
+/** p: Prüfdatum, k: Kanzlei prüfen, grund: von Hand gesetzter Grund (siehe Grund), ab/bis: Gültigkeit, befund: was beim Lesen der Quelle auffiel (der Wert bleibt, bis Nick und die Kanzlei entscheiden). */
+type Optionen = { p?: string; k?: true; ab?: string; bis?: string; stichtag?: string; befund?: string; grund?: Grund };
 type Angabe = { titel: string; gebiet: Gebiet; norm: string; url: string | null; rhythmus: Rhythmus } & Optionen;
 const EU_ENTGELT = "https://eur-lex.europa.eu/legal-content/DE/TXT/HTML/?uri=CELEX:32023L0970";
-const HBUG = "https://www.rv.hessenrecht.hessen.de/bshe/document/jlr-BildUrlGHErahmen";
+const HBUG = "https://www.rv.hessenrecht.hessen.de/bshe/document/jlr-NNLHE000051B6";
 const DGUV_V1 = "https://publikationen.dguv.de/regelwerk/dguv-vorschriften/2909/grundsaetze-der-praevention";
 const G = "2026-10-10"; // Prüfdatum: Wert an diesem Tag im amtlichen Wortlaut gelesen.
 const S29 = "2026-10-11"; // Prüfdatum der Firmenwagen-Werte (Strang 29, Destillat 20).
 const LSTH_ANHANG_24 = "https://lsth.bundesfinanzministerium.de/lsth/2026/B-Anhaenge/Anhang-24/IV/IV-6/inhalt.html";
 const S30 = "2026-10-11"; // Prüfdatum der Werte zu Zusatzleistungen und Dienstrad (Strang 30, Destillat 20, Abruf 11.10.2026).
+const P29 = "2026-10-29"; // Prüfdatum der Nachprüfung vom 29.10.2026 (Session mit Nick): Wert im amtlichen Wortlaut gelesen; Werte mit Vorbehalt in werte.ts bleiben "Kanzlei prüfen".
 
 /** Gesetz oder Verordnung. */
 const g = (titel: string, gebiet: Gebiet, norm: string, url: string | null, o: Optionen = {}): Angabe => ({ titel, gebiet, norm, url, rhythmus: "Gesetz", ...o });
@@ -168,12 +198,12 @@ const r = (titel: string, gebiet: Gebiet, norm: string, url: string | null, o: O
 /** Verwaltungspraxis, Unfallversicherung, Technische Regeln. */
 const v = (titel: string, gebiet: Gebiet, norm: string, url: string | null, o: Optionen = {}): Angabe => ({ titel, gebiet, norm, url, rhythmus: "Verwaltung", ...o });
 /** Eigene Lintelly-Annahme: keine Rechtsquelle, Nick entscheidet, die Kanzlei sieht drüber. */
-const l = (titel: string, gebiet: Gebiet, norm = "Lintelly-Standard"): Angabe => ({ titel, gebiet, norm, url: null, rhythmus: "Lintelly", k: true });
+const l = (titel: string, gebiet: Gebiet, norm = "Lintelly-Standard"): Angabe => ({ titel, gebiet, norm, url: null, rhythmus: "Lintelly", k: true, grund: "Lintelly-Standard" });
 
 const W: { [K in keyof typeof WERTE]: Angabe } = {
   probezeitHoechstMonate: g("Probezeit mit verkürzter Kündigungsfrist, höchstens", "Kündigung und Vertrag", "§ 622 Abs. 3 BGB", gii("bgb", "622"), { p: G }),
   probezeitKuendigungTage: g("Kündigungsfrist in der Probezeit", "Kündigung und Vertrag", "§ 622 Abs. 3 BGB", gii("bgb", "622"), { p: G }),
-  probezeitBefristungAnteil: g("Probezeit im befristeten Vertrag im Verhältnis zur Laufzeit", "Befristung und Teilzeit", "§ 15 Abs. 3 TzBfG", gii("tzbfg", "15")),
+  probezeitBefristungAnteil: g("Probezeit im befristeten Vertrag im Verhältnis zur Laufzeit", "Befristung und Teilzeit", "§ 15 Abs. 3 TzBfG", gii("tzbfg", "15"), { p: P29, grund: "Auslegung" }),
   kschgWartezeitMonate: g("Wartezeit Kündigungsschutz", "Kündigung und Vertrag", "§ 1 Abs. 1 KSchG", gii("kschg", "1"), { p: G }),
   kschgSchwelle: g("Kleinbetrieb: Kündigungsschutzgesetz ab mehr als", "Schwellenwerte", "§ 23 Abs. 1 KSchG", gii("kschg", "23"), { p: G }),
   kschgAltfall: g("Kündigungsschutz Altfall: vor 2004 Eingestellte, Schwelle mehr als", "Schwellenwerte", "§ 23 Abs. 1 Satz 2 und 3 KSchG", gii("kschg", "23"), { p: "2026-10-11", k: true }),
@@ -183,12 +213,12 @@ const W: { [K in keyof typeof WERTE]: Angabe } = {
   vorbeschaeftigungVerbot: r("Vorbeschäftigung vor sachgrundloser Befristung: Ausnahme nur im Einzelfall", "Befristung und Teilzeit", "§ 14 Abs. 2 Satz 2 TzBfG, BVerfG 1 BvL 7/14, BAG 7 AZR 733/16", BAG("7-azr-733-16"), { p: "2026-10-11", k: true }),
   befristungSchriftform: g("Befristung nur schriftlich", "Befristung und Teilzeit", "§ 14 Abs. 4 TzBfG", gii("tzbfg", "14"), { p: G }),
   urlaubUebertragBis: g("Übertragung des Urlaubs bis", "Urlaub", "§ 7 Abs. 3 BUrlG", gii("burlg", "7"), { p: G, stichtag: "31.03." }),
-  urlaubHinweispflicht: r("Hinweispflicht vor Verfall des Urlaubs", "Urlaub", "BAG 9 AZR 423/16, BAG 9 AZR 266/20", BAG("9-azr-423-16")),
+  urlaubHinweispflicht: r("Hinweispflicht vor Verfall des Urlaubs", "Urlaub", "BAG 9 AZR 423/16, BAG 9 AZR 266/20", BAG("9-azr-423-16"), { p: P29 }),
   urlaubSonderregel: r("Verfall bei Krankheit, Mutterschutz, Elternzeit", "Urlaub", "§ 7 Abs. 3 BUrlG, § 24 MuSchG, § 17 BEEG, BAG 9 AZR 353/10", BAG("9-azr-353-10"), { k: true }),
   urlaubKrankSonderTage: l("Lange Krankheit für die Urlaubssonderregel ab", "Urlaub"),
   entgeltfortzahlungTage: g("Entgeltfortzahlung im Krankheitsfall", "Krankheit und BEM", "§ 3 Abs. 1 EFZG", gii("entgfg", "3"), { p: G }),
-  entgeltAuskunftMonate: g("Entgelttransparenz: Frist für die Auskunft", "Entgelttransparenz", "Art. 7 Abs. 4 RL (EU) 2023/970", EU_ENTGELT),
-  bemLoeschfrist: g("Löschfrist BEM-Unterlagen nach Abschluss", "Krankheit und BEM", "Art. 5 Abs. 1 lit. e DSGVO, § 26 Abs. 3 BDSG", EU_DSGVO),
+  entgeltAuskunftMonate: g("Entgelttransparenz: Frist für die Auskunft", "Entgelttransparenz", "Art. 7 Abs. 4 RL (EU) 2023/970", EU_ENTGELT, { p: P29 }),
+  bemLoeschfrist: g("Löschfrist BEM-Unterlagen nach Abschluss", "Krankheit und BEM", "Art. 5 Abs. 1 lit. e DSGVO, § 26 Abs. 3 BDSG", EU_DSGVO, { grund: "Aufbewahrung" }),
   bemSchwelleTage: g("BEM anbieten ab Arbeitsunfähigkeit von mehr als", "Krankheit und BEM", "§ 167 Abs. 2 SGB IX", gii("sgb_9_2018", "167"), { p: G }),
   mutterschutzVorTage: g("Mutterschutz vor der Entbindung", "Mutterschutz und Elternzeit", "§ 3 Abs. 1 MuSchG", gii("muschg_2018", "3"), { p: G }),
   mutterschutzNachTage: g("Mutterschutz nach der Entbindung", "Mutterschutz und Elternzeit", "§ 3 Abs. 2 MuSchG", gii("muschg_2018", "3"), { p: G }),
@@ -213,20 +243,20 @@ const W: { [K in keyof typeof WERTE]: Angabe } = {
   pflegezeitAnkuendigungArbeitstage: g("Pflegezeit ankündigen, Frist", "Pflege", "§ 3 Abs. 3 PflegeZG", gii("pflegezg", "3"), { p: G }),
   familienpflegezeitAnkuendigungWochen: g("Familienpflegezeit ankündigen, Frist", "Pflege", "§ 2a Abs. 1 FPfZG", gii("fpfzg", "2a"), { p: G }),
   schwerbehindertKuendigung: g("Schwerbehinderung: Zustimmung Integrationsamt nach den ersten Monaten", "Kündigung und Vertrag", "§§ 168, 173 SGB IX", gii("sgb_9_2018", "173"), { p: G }),
-  pflegeKuendigungsschutzVorherWochen: g("Kündigungsschutz vor Pflegezeit", "Pflege", "§ 5 Abs. 1 PflegeZG", gii("pflegezg", "5")),
+  pflegeKuendigungsschutzVorherWochen: g("Kündigungsschutz vor Pflegezeit", "Pflege", "§ 5 Abs. 1 PflegeZG", gii("pflegezg", "5"), { p: P29 }),
   zusatzurlaubSchwerbehindert: g("Zusatzurlaub schwerbehinderter Menschen", "Urlaub", "§ 208 Abs. 1 SGB IX", gii("sgb_9_2018", "208"), { p: G }),
   kuendigungSchriftform: g("Kündigung und Aufhebungsvertrag nur schriftlich", "Kündigung und Vertrag", "§ 623 BGB", gii("bgb", "623"), { p: G }),
   betriebsratAnhoerung: g("Anhörung des Betriebsrats vor jeder Kündigung", "Kündigung und Vertrag", "§ 102 BetrVG", gii("betrvg", "102"), { p: G }),
-  betriebsratAnhoerungFrist: g("Frist des Betriebsrats nach der Anhörung", "Kündigung und Vertrag", "§ 102 Abs. 2 BetrVG", gii("betrvg", "102")),
+  betriebsratAnhoerungFrist: g("Frist des Betriebsrats nach der Anhörung", "Kündigung und Vertrag", "§ 102 Abs. 2 BetrVG", gii("betrvg", "102"), { p: P29 }),
   bvKuendigungsfristMonate: g("Kündigungsfrist einer Betriebsvereinbarung", "Kündigung und Vertrag", "§ 77 Abs. 5 BetrVG", gii("betrvg", "77"), { p: "2026-10-11" }),
-  fristloseKenntnisWochen: g("Fristlose Kündigung: Frist ab Kenntnis", "Kündigung und Vertrag", "§ 626 Abs. 2 BGB", gii("bgb", "626")),
-  br99Schwelle: g("Betriebsrat: Zustimmung zu personellen Einzelmaßnahmen ab Unternehmensgröße", "Schwellenwerte", "§ 99 Abs. 1 BetrVG", gii("betrvg", "99")),
-  br99FristTage: g("Betriebsrat: Frist für die Verweigerung der Zustimmung", "Kündigung und Vertrag", "§ 99 Abs. 3 BetrVG", gii("betrvg", "99")),
-  br100AntragTage: g("Vorläufige Maßnahme: Antrag beim Arbeitsgericht nach Bestreiten", "Kündigung und Vertrag", "§ 100 Abs. 2 BetrVG", gii("betrvg", "100")),
-  br102Widerspruch: g("Widerspruch des Betriebsrats gegen die Kündigung", "Kündigung und Vertrag", "§ 102 Abs. 3 bis 5 BetrVG", gii("betrvg", "102")),
-  br103Zustimmung: g("Kündigung und Versetzung von Mitgliedern des Betriebsrats", "Kündigung und Vertrag", "§ 103 BetrVG", gii("betrvg", "103")),
-  unfallanzeigeBetriebsrat: g("Unfallanzeige: Mitzeichnung durch den Betriebsrat", "Arbeitsschutz", "§ 193 Abs. 5 SGB VII", gii("sgb_7", "193")),
-  kuendigungVollmacht: g("Kündigung durch Bevollmächtigte: Vollmacht im Original", "Kündigung und Vertrag", "§ 174 BGB", gii("bgb", "174")),
+  fristloseKenntnisWochen: g("Fristlose Kündigung: Frist ab Kenntnis", "Kündigung und Vertrag", "§ 626 Abs. 2 BGB", gii("bgb", "626"), { p: P29 }),
+  br99Schwelle: g("Betriebsrat: Zustimmung zu personellen Einzelmaßnahmen ab Unternehmensgröße", "Schwellenwerte", "§ 99 Abs. 1 BetrVG", gii("betrvg", "99"), { p: P29 }),
+  br99FristTage: g("Betriebsrat: Frist für die Verweigerung der Zustimmung", "Kündigung und Vertrag", "§ 99 Abs. 3 BetrVG", gii("betrvg", "99"), { p: P29 }),
+  br100AntragTage: g("Vorläufige Maßnahme: Antrag beim Arbeitsgericht nach Bestreiten", "Kündigung und Vertrag", "§ 100 Abs. 2 BetrVG", gii("betrvg", "100"), { p: P29 }),
+  br102Widerspruch: g("Widerspruch des Betriebsrats gegen die Kündigung", "Kündigung und Vertrag", "§ 102 Abs. 3 bis 5 BetrVG", gii("betrvg", "102"), { p: P29 }),
+  br103Zustimmung: g("Kündigung und Versetzung von Mitgliedern des Betriebsrats", "Kündigung und Vertrag", "§ 103 BetrVG", gii("betrvg", "103"), { p: P29 }),
+  unfallanzeigeBetriebsrat: g("Unfallanzeige: Mitzeichnung durch den Betriebsrat", "Arbeitsschutz", "§ 193 Abs. 5 SGB VII", gii("sgb_7", "193"), { p: P29 }),
+  kuendigungVollmacht: g("Kündigung durch Bevollmächtigte: Vollmacht im Original", "Kündigung und Vertrag", "§ 174 BGB", gii("bgb", "174"), { grund: "Auslegung" }),
   aufhebungSperrzeit: g("Sperrzeit beim Arbeitslosengeld nach Aufhebungsvertrag", "Kündigung und Vertrag", "§ 159 Abs. 1 SGB III", gii("sgb_3", "159"), { p: G }),
   arbzgPause6: g("Pause ab mehr als 6 Stunden", "Arbeitszeit", "§ 4 Satz 1 ArbZG", gii("arbzg", "4"), { p: G }),
   arbzgPause9: g("Pause ab mehr als 9 Stunden", "Arbeitszeit", "§ 4 Satz 1 ArbZG", gii("arbzg", "4"), { p: G }),
@@ -235,26 +265,26 @@ const W: { [K in keyof typeof WERTE]: Angabe } = {
   arbzgNachtzeit: g("Nachtzeit und Nachtarbeit", "Arbeitszeit", "§ 2 Abs. 3 und 4 ArbZG", gii("arbzg", "2"), { p: G }),
   krankAuAbTag: g("Ärztliche Bescheinigung ab mehr als", "Krankheit und BEM", "§ 5 Abs. 1 EFZG", gii("entgfg", "5"), { p: G }),
   loeschungVorlaufTage: l("Löschliste vor Ablauf der Aufbewahrung", "Aufbewahrung"),
-  bildungsurlaubTage: g("Bildungsurlaub Hessen je Jahr", "Urlaub", "§ 2 Abs. 1 HBUG", HBUG, { bis: "2029-12-31" }),
-  bildungsurlaubWartezeitMonate: g("Bildungsurlaub Hessen, Wartezeit", "Urlaub", "§ 4 HBUG", HBUG, { bis: "2029-12-31" }),
-  bildungsurlaubMitteilungWochen: g("Bildungsurlaub Hessen, Mitteilung vor Beginn", "Urlaub", "§ 5 Abs. 1 HBUG", HBUG, { bis: "2029-12-31" }),
+  bildungsurlaubTage: g("Bildungsurlaub Hessen je Jahr", "Urlaub", "§ 2 Abs. 1 HBUG", HBUG, { p: P29, bis: "2029-12-31" }),
+  bildungsurlaubWartezeitMonate: g("Bildungsurlaub Hessen, Wartezeit", "Urlaub", "§ 4 HBUG", HBUG, { p: P29, bis: "2029-12-31" }),
+  bildungsurlaubMitteilungWochen: g("Bildungsurlaub Hessen, Mitteilung vor Beginn", "Urlaub", "§ 5 Abs. 1 HBUG", HBUG, { p: P29, bis: "2029-12-31" }),
   elternzeitAnmeldungWochenNach3: g("Elternzeit verlangen, Frist nach dem 3. Geburtstag", "Mutterschutz und Elternzeit", "§ 16 Abs. 1 Satz 1 Nr. 2 BEEG", gii("beeg", "16"), { p: G }),
   werkstudentJahreswochen: v("Werkstudent: Wochen über 20 Stunden im Jahr", "Ausbildung und Werkstudium", "Rundschreiben der SV-Spitzenverbände", null, { k: true }),
   dsgvoAntwortMonate: g("Antwort auf Auskunft und Löschwunsch", "Datenschutz und Hinweisgeber", "Art. 12 Abs. 3 DSGVO", EU_DSGVO, { p: G }),
   hinschgDokumentationJahre: g("Hinweisgeber: Dokumentation löschen nach", "Datenschutz und Hinweisgeber", "§ 11 Abs. 5 HinSchG", gii("hinschg", "11"), { p: G }),
   chatLoeschfristMonate: l("Löschfrist für Chatverläufe", "Datenschutz und Hinweisgeber", "Lintelly-Standard (Art. 5 Abs. 1 lit. e DSGVO)"),
-  hoechstarbeitszeitWoche: g("Höchstarbeitszeit je Woche im Schnitt", "Arbeitszeit", "§ 3 ArbZG", gii("arbzg", "3"), { k: true }),
+  hoechstarbeitszeitWoche: g("Höchstarbeitszeit je Woche im Schnitt", "Arbeitszeit", "§ 3 ArbZG", gii("arbzg", "3"), { k: true, grund: "Umrechnung" }),
   azubiProbezeit: g("Ausbildung: Kündigung in der Probezeit", "Ausbildung und Werkstudium", "§§ 20, 22 Abs. 1 BBiG", gii("bbig_2005", "22"), { p: G }),
   azubiProbezeitMonate: g("Ausbildung: Dauer der Probezeit", "Ausbildung und Werkstudium", "§ 20 Satz 2 BBiG", gii("bbig_2005", "20"), { p: G }),
-  azubiKuendigungWochen: g("Ausbildung: Kündigung bei Aufgabe oder Berufswechsel", "Ausbildung und Werkstudium", "§ 22 Abs. 2 Nr. 2 BBiG", gii("bbig_2005", "22")),
+  azubiKuendigungWochen: g("Ausbildung: Kündigung bei Aufgabe oder Berufswechsel", "Ausbildung und Werkstudium", "§ 22 Abs. 2 Nr. 2 BBiG", gii("bbig_2005", "22"), { p: P29 }),
   azubiAufschlag: g("Mindestausbildungsvergütung: Aufschläge 2. bis 4. Jahr", "Ausbildung und Werkstudium", "§ 17 Abs. 2 Satz 1 BBiG", gii("bbig_2005", "17"), { p: G }),
   azubiKuendigungKenntnisWochen: g("Ausbildung: Kündigung aus wichtigem Grund nach Kenntnis", "Ausbildung und Werkstudium", "§ 22 Abs. 4 BBiG", gii("bbig_2005", "22"), { p: G }),
   azubiNiederschriftAufbewahrung: g("Ausbildung: Niederschrift aufbewahren", "Ausbildung und Werkstudium", "§ 11 Abs. 2 BBiG", gii("bbig_2005", "11"), { p: G }),
-  azubiEintragung: g("Ausbildung: Eintragung bei der zuständigen Stelle", "Ausbildung und Werkstudium", "§ 36 BBiG", gii("bbig_2005", "36")),
-  werkstudentSemesterferien: v("Werkstudent: mehr Stunden in der vorlesungsfreien Zeit", "Ausbildung und Werkstudium", "§ 6 Abs. 1 Nr. 3 SGB V, Rundschreiben", gii("sgb_5", "6")),
-  werkstudentNachweis: g("Werkstudent: Immatrikulation zu den Entgeltunterlagen", "Ausbildung und Werkstudium", "§ 8 Abs. 2 BVV", gii("beitrvv", "8")),
+  azubiEintragung: g("Ausbildung: Eintragung bei der zuständigen Stelle", "Ausbildung und Werkstudium", "§ 36 BBiG", gii("bbig_2005", "36"), { p: P29 }),
+  werkstudentSemesterferien: v("Werkstudent: mehr Stunden in der vorlesungsfreien Zeit", "Ausbildung und Werkstudium", "§ 6 Abs. 1 Nr. 3 SGB V, Rundschreiben", gii("sgb_5", "6"), { grund: "Auslegung" }),
+  werkstudentNachweis: g("Werkstudent: Immatrikulation zu den Entgeltunterlagen", "Ausbildung und Werkstudium", "§ 8 Abs. 2 BVV", gii("beitrvv", "8"), { grund: "Auslegung" }),
   ausschlussfristMonate: r("Ausschlussfrist im Arbeitsvertrag", "Kündigung und Vertrag", "Rechtsprechung des BAG, marktüblich", null, { k: true }),
-  ausschlussfristRecht: r("Ausschlussfrist: Ausnahmen und Textform", "Kündigung und Vertrag", "§ 3 MiLoG, §§ 202, 309 BGB, BAG 9 AZR 162/18", BAG("9-azr-162-18")),
+  ausschlussfristRecht: r("Ausschlussfrist: Ausnahmen und Textform", "Kündigung und Vertrag", "§ 3 MiLoG, §§ 202, 309 BGB, BAG 9 AZR 162/18", BAG("9-azr-162-18"), { p: P29 }),
   statusfeststellung: v("Statusfeststellung bei der Rentenversicherung", "Freelancer", "§ 7a SGB IV", WERTE.statusfeststellung.url, { p: G }),
   scheinselbststaendigkeit: v("Scheinselbstständigkeit: Merkmale", "Freelancer", "§ 7 Abs. 1 SGB IV", WERTE.scheinselbststaendigkeit.url, { p: G }),
   freierMitarbeiterRentenpflicht: g("Rentenversicherungspflicht Selbstständiger mit einem Auftraggeber", "Freelancer", "§ 2 Satz 1 Nr. 9 SGB VI", gii("sgb_6", "2"), { p: G }),
@@ -277,13 +307,13 @@ const W: { [K in keyof typeof WERTE]: Angabe } = {
   pfaendungErklaerungWochen: g("Lohnpfändung: Erklärung des Arbeitgebers als Drittschuldner", "Lohn und Sozialversicherung", "§ 840 Abs. 1 ZPO", gii("zpo", "840"), { p: "2026-10-11" }),
   praktikumMindestlohn: g("Praktikum: Mindestlohn ab mehr als drei Monaten", "Lohn und Sozialversicherung", "§ 22 Abs. 1 Satz 2 Nr. 1 bis 3 MiLoG", gii("milog", "22"), { p: "2026-10-11" }),
   umlageTeilzeitFaktor: g("Teilzeit in der Zählung für die Umlage U1", "Lohn und Sozialversicherung", "§ 3 Abs. 1 Satz 6 AAG", gii("aufag", "3"), { p: "2026-10-11" }),
-  umlageU1Grenze: g("Umlage U1 bis", "Lohn und Sozialversicherung", "§ 1 Abs. 1 AAG", gii("aufag", "1")),
+  umlageU1Grenze: g("Umlage U1 bis", "Lohn und Sozialversicherung", "§ 1 Abs. 1 AAG", gii("aufag", "1"), { p: P29 }),
   krankenquoteVergleich: l("Vergleichswert Krankenquote", "Krankheit und BEM", "Lintelly-Vergleichswert, kein amtlicher Wert"),
   gesundheitMinGruppe: l("Kleinste Gruppe für Gesundheitswerte", "Datenschutz und Hinweisgeber", "Lintelly-Regel (Art. 5, Art. 9 DSGVO)"),
   gehaltAenderungZweiteBestaetigung: l("Gehaltsänderung: zweite Bestätigung ab Abweichung", "Lohn und Sozialversicherung"),
   einmalbetragZweiteBestaetigung: l("Einmalbetrag: zweite Bestätigung über einem Monatsgehalt", "Lohn und Sozialversicherung"),
   abmahnungZeitnahTage: r("Abmahnung zeitnah zum Vorfall", "Kündigung und Vertrag", "Verwirkung, kein gesetzlicher Zeitraum", null, { k: true }),
-  mindesturlaub: g("Gesetzlicher Mindesturlaub", "Urlaub", "§ 3 Abs. 1 BUrlG", gii("burlg", "3"), { p: G, k: true, befund: "24 Werktage stehen im Wortlaut; 20 Arbeitstage bei fünf Tagen je Woche sind die übliche Umrechnung, nicht im Gesetzestext" }),
+  mindesturlaub: g("Gesetzlicher Mindesturlaub", "Urlaub", "§ 3 Abs. 1 BUrlG", gii("burlg", "3"), { p: G, k: true, grund: "Umrechnung", befund: "24 Werktage stehen im Wortlaut; 20 Arbeitstage bei fünf Tagen je Woche sind die übliche Umrechnung, nicht im Gesetzestext" }),
   urlaubsentgeltWochen: g("Urlaubsentgelt und Abgeltung: Bezugszeitraum", "Urlaub", "§ 11 Abs. 1 BUrlG", gii("burlg", "11"), { p: "2026-10-18" }),
   urlaubWartezeitMonate: g("Wartezeit für den vollen Urlaub", "Urlaub", "§ 4 BUrlG", gii("burlg", "4"), { p: G }),
   urlaubJahreshinweis: l("Jahreshinweis zum Urlaub bis", "Urlaub"),
@@ -307,7 +337,7 @@ const W: { [K in keyof typeof WERTE]: Angabe } = {
   elternzeitErsterAbschnittMonate: g("Elternzeit bis zum 3. Geburtstag", "Mutterschutz und Elternzeit", "§ 16 Abs. 1 Satz 1 BEEG", gii("beeg", "16"), { p: G }),
   elternzeitSichtNachRueckkehrTage: l("Elternzeit-Hinweise nach der Rückkehr sichtbar", "Mutterschutz und Elternzeit"),
   feedbackNachMonaten: l("Feedbackgespräch nach dem Start", "Abläufe von Lintelly"),
-  bemZeitraumTage: g("BEM: Zeitraum der Zählung", "Krankheit und BEM", "§ 167 Abs. 2 SGB IX", gii("sgb_9_2018", "167"), { k: true }),
+  bemZeitraumTage: g("BEM: Zeitraum der Zählung", "Krankheit und BEM", "§ 167 Abs. 2 SGB IX", gii("sgb_9_2018", "167"), { k: true, grund: "Umrechnung" }),
   efzNeuerAnspruch: g("Entgeltfortzahlung: neuer Anspruch bei derselben Krankheit", "Krankheit und BEM", "§ 3 Abs. 1 Satz 2 EFZG", gii("entgfg", "3"), { p: G }),
   werkstudentWarnung: l("Werkstudent: Warnung vor der Jahresgrenze", "Ausbildung und Werkstudium"),
   wochenJeMonat: l("Wochen je Monat (Rechenwert)", "Lohn und Sozialversicherung", "Lintelly-Rechenwert, kein Rechtswert"),
@@ -317,7 +347,7 @@ const W: { [K in keyof typeof WERTE]: Angabe } = {
   vorfallZielTage: l("Vorfälle: Ziele ohne gesetzliche Frist", "Abläufe von Lintelly"),
   datenpanneVielePersonen: l("Datenpanne: viele Betroffene ab", "Datenschutz und Hinweisgeber"),
   jugendlicheBisJahre: g("Jugendliche: unter", "Arbeitszeit", "§ 2 Abs. 2 JArbSchG", gii("jarbschg", "2"), { p: G }),
-  bildungsurlaubAblehnungWochen: g("Bildungsurlaub Hessen, Ablehnung binnen", "Urlaub", "§ 5 Abs. 6 HBUG", HBUG, { bis: "2029-12-31" }),
+  bildungsurlaubAblehnungWochen: g("Bildungsurlaub Hessen, Ablehnung binnen", "Urlaub", "§ 5 Abs. 6 HBUG", HBUG, { p: P29, bis: "2029-12-31" }),
   pflegezeitHoechstMonate: g("Pflegezeit höchstens", "Pflege", "§ 4 Abs. 1 PflegeZG", gii("pflegezg", "4"), { p: G }),
   familienpflegezeit: g("Familienpflegezeit: Dauer und Mindeststunden", "Pflege", "§ 2 Abs. 1 FPfZG", gii("fpfzg", "2"), { p: G }),
   brueckenteilzeit: g("Brückenteilzeit: Dauer und Zumutbarkeit", "Befristung und Teilzeit", "§ 9a TzBfG", gii("tzbfg", "9a"), { p: G }),
@@ -381,12 +411,12 @@ const reihe = (liste: ZeitWert[], text: (w: number) => string): Zeitwert[] =>
   liste.map((w, i) => ({ gueltigAb: w.gueltigAb, gueltigBis: liste[i + 1] ? tagDavor(liste[i + 1].gueltigAb) : `${w.gueltigAb.slice(0, 4)}-12-31`, wert: `${text(w.wert)}${w.bestaetigt === false ? " (vorläufig, noch nicht verkündet)" : ""}` }));
 /** Steht in der Reihe ein vorläufiger Wert, bleibt der Eintrag auf "Kanzlei prüfen", bis er verkündet ist. */
 /** Ausstehender Folgejahreswert als eigene Zeile: Quelle und Termin statt einer Zahl. */
-const ausstehend = (a: (typeof AUSSTEHEND)[keyof typeof AUSSTEHEND]): Zeitwert => ({ gueltigAb: a.gueltigAb, gueltigBis: `${a.gueltigAb.slice(0, 4)}-12-31`, wert: `ausstehend, erwartet: ${a.erwartet}. ${a.quelle}`, ausstehend: true });
-const vorlaeufig = (liste: ZeitWert[]) => (liste.some((w) => w.bestaetigt === false) ? { k: true as const } : {});
+const ausstehend = (a: (typeof AUSSTEHEND)[keyof typeof AUSSTEHEND]): Zeitwert => ({ gueltigAb: a.gueltigAb, gueltigBis: `${a.gueltigAb.slice(0, 4)}-12-31`, wert: `ausstehend, erwartet: ${a.erwartet}. ${a.quelle}`, ausstehend: true, ...(a.rotAb ? { rotAb: a.rotAb } : {}) });
+const vorlaeufig = (liste: ZeitWert[]) => (liste.some((w) => w.bestaetigt === false) ? { k: true as const, grund: "vorläufig" as const } : {});
 const prozent = (n: number) => anteil(n, 2);
 const letzteQuelle = (liste: ZeitWert[]) => liste[liste.length - 1].quelle;
 
-type Reihe = Omit<RegisterEintrag, "naechstePruefung" | "status" | "stichtag" | "rhythmus" | "hinweis"> & { hinweis?: string; k?: true };
+type Reihe = Omit<RegisterEintrag, "naechstePruefung" | "status" | "stichtag" | "rhythmus" | "hinweis" | "grund"> & { hinweis?: string; k?: true; grund?: Grund };
 const MINIJOB = "https://magazin.minijob-zentrale.de/";
 const BMG = "https://www.bundesgesundheitsministerium.de/";
 const REIHEN: Reihe[] = [
@@ -399,17 +429,22 @@ const REIHEN: Reihe[] = [
   { id: "satzKvPv", titel: "Beitragssatz Kranken- und Pflegeversicherung mit Zusatzbeitrag", gebiet: "Lohn und Sozialversicherung", norm: "§ 241 SGB V, § 242a SGB V, § 55 SGB XI", quelleUrl: `${BMG}beitraege`, weitereQuellen: [`${BMG}themen/pflege/online-ratgeber-pflege/die-pflegeversicherung/finanzierung`], pruefzahlen: ["14,6", "2,9", "3,6"], werte: [...reihe(SATZ_KV_PV, prozent), ausstehend(AUSSTEHEND.satzKvPv)], geprueftAm: G, hinweis: `${letzteQuelle(SATZ_KV_PV)}. Teile am Prüfdatum im Wortlaut gelesen: 14,6 % und 2,9 % (BMG), 3,6 % (BMG Pflege). Der Zusatzbeitrag ist ein Durchschnitt, die Kasse der Person setzt ihren eigenen Satz; § 55 Abs. 1 SGB XI nennt im Gesetzestext noch 3,4 %`, k: true },
   { id: "sachbezugMittag", titel: "Sachbezugswert Mittag- oder Abendessen je Tag (Essenmarke)", gebiet: "Lohn und Sozialversicherung", norm: "§ 2 Abs. 1 Nr. 2 und 3 SvEV", quelleUrl: gii("svev", "2"), werte: reihe(SACHBEZUG_MITTAG, euro), geprueftAm: S30, hinweis: letzteQuelle(SACHBEZUG_MITTAG), ...vorlaeufig(SACHBEZUG_MITTAG) },
   { id: "minijobAgPauschale", titel: "Minijob: Pauschalen des Arbeitgebers", gebiet: "Lohn und Sozialversicherung", norm: "§ 249b SGB V, § 172 Abs. 3 SGB VI, § 40a Abs. 2 EStG", quelleUrl: gii("sgb_5", "249b"),
-    werte: [...reihe(MINIJOB_AG_PAUSCHALE, prozent), ausstehend(AUSSTEHEND.minijobAgPauschale)], geprueftAm: null, hinweis: letzteQuelle(MINIJOB_AG_PAUSCHALE), k: true },
+    werte: [...reihe(MINIJOB_AG_PAUSCHALE, prozent), ausstehend(AUSSTEHEND.minijobAgPauschale)], geprueftAm: null, hinweis: letzteQuelle(MINIJOB_AG_PAUSCHALE), k: true, grund: "nie geprüft" },
+  // Faktor F 2026 am 29.10.2026 im Wortlaut der Bekanntmachung (Bundesanzeiger) gelesen; Formeln in § 20 Abs. 2a SGB IV, Beispieltabelle der DRV (tests/midijob.test.ts).
+  { id: "faktorF", titel: "Übergangsbereich (Midijob): Faktor F", gebiet: "Lohn und Sozialversicherung", norm: "§ 20 Abs. 2a SGB IV, Bekanntmachung des BMAS je Jahr",
+    quelleUrl: "https://www.bundesanzeiger.de/pub/publication/tEVvKJtcxc4VdUgfyAg/content/tEVvKJtcxc4VdUgfyAg/BAnz%20AT%2018.12.2025%20B5.pdf",
+    weitereQuellen: ["https://rvrecht.deutsche-rentenversicherung.de/SharedDocs/rvRecht/07_AktuelleWerte/D-G/awert_glzre.html", gii("sgb_4", "20")],
+    werte: [...reihe(FAKTOR_F, zahl), ausstehend(AUSSTEHEND.faktorF)], geprueftAm: "2026-10-29", hinweis: letzteQuelle(FAKTOR_F) },
   { id: "mindestausbildung", titel: "Mindestausbildungsvergütung je Beginnjahr (1. bis 4. Jahr)", gebiet: "Ausbildung und Werkstudium", norm: "§ 17 Abs. 2 BBiG, Bekanntmachung je Jahr", quelleUrl: "https://www.gesetze-im-internet.de/bbimindvergfbek_2027/BJNR11F0A0026.html", weitereQuellen: ["https://www.gesetze-im-internet.de/bbimindvergfbek_2026/BJNR0EB0A0025.html"],
     werte: Object.entries(MINDESTAUSBILDUNG).map(([jahr, e]) => ({ gueltigAb: `${jahr}-01-01`, gueltigBis: `${jahr}-12-31`, wert: e.jahre.map((n) => euro(n)).join(", ") })), geprueftAm: "2026-10-23", hinweis: "Maßgeblich ist das Jahr des Ausbildungsbeginns. Beträge 2026 und 2027 am 23.10.2026 im Wortlaut beider Bekanntmachungen gelesen (Rechtsradar, BGBl. 2026 I Nr. 287)" },
 ];
 
 const listeEintraege: RegisterEintrag[] = [
-  ...Object.entries(AUFBEWAHRUNG).map(([id, a]) => eintrag(`aufbewahrung.${id}`, { titel: `Aufbewahrung ${id}`, gebiet: "Aufbewahrung", norm: a.norm, url: EU_DSGVO, rhythmus: "Gesetz", k: true },
+  ...Object.entries(AUFBEWAHRUNG).map(([id, a]) => eintrag(`aufbewahrung.${id}`, { titel: `Aufbewahrung ${id}`, gebiet: "Aufbewahrung", norm: a.norm, url: EU_DSGVO, rhythmus: "Gesetz", k: true, grund: "Aufbewahrung" },
     [{ gueltigAb: null, gueltigBis: null, wert: `${a.jahre} Jahre ab ${a.bezug === "austritt" ? "Austritt" : "Datum des Dokuments"}` }], a.norm)),
-  ...Object.entries(AUFBEWAHRUNG_MODULE).map(([id, a]) => eintrag(`aufbewahrung.modul.${id}`, { titel: `Aufbewahrung: ${a.name}`, gebiet: "Aufbewahrung", norm: a.norm, url: id === "verbandbuch" ? DGUV_V1 : EU_DSGVO, rhythmus: "Gesetz", k: true },
+  ...Object.entries(AUFBEWAHRUNG_MODULE).map(([id, a]) => eintrag(`aufbewahrung.modul.${id}`, { titel: `Aufbewahrung: ${a.name}`, gebiet: "Aufbewahrung", norm: a.norm, url: id === "verbandbuch" ? DGUV_V1 : EU_DSGVO, rhythmus: "Gesetz", k: true, grund: "Aufbewahrung" },
     [{ gueltigAb: null, gueltigBis: null, wert: a.jahre === null ? "keine Zahl, die Kanzlei legt sie fest" : `${a.jahre} Jahre ab ${a.bezug === "austritt" ? "Austritt" : a.bezug === "ende" ? "Ende der Runde" : "Ereignis"}` }], a.norm)),
-  eintrag("feiertage.bund", { titel: "Gesetzliche Feiertage bundesweit", gebiet: "Feiertage", norm: FEIERTAGE.bund.quelle, url: "https://www.rv.hessenrecht.hessen.de/bshe/document/jlr-FeiertGHErahmen", rhythmus: "Gesetz", k: true },
+  eintrag("feiertage.bund", { titel: "Gesetzliche Feiertage bundesweit", gebiet: "Feiertage", norm: FEIERTAGE.bund.quelle, url: "https://www.rv.hessenrecht.hessen.de/bshe/document/jlr-NNLHE000051B5", rhythmus: "Gesetz", p: P29 },
     [{ gueltigAb: null, gueltigBis: null, wert: FEIERTAGE.bund.tage.map((t) => t.name).join(", ") }], FEIERTAGE.bund.quelle),
   // Alle 16 Länder (Bayern in drei Gebieten, alle aus demselben Gesetz), Strang 24. Nur Bayern war am Prüfdatum im Wortlaut gelesen; die übrigen
   // Länder stehen mit amtlicher Fundstelle, aber ohne Wortlaut-Prüfung im Register und gelten bis dahin als "Kanzlei prüfen" (wie bisher Hessen und Berlin).
@@ -422,9 +457,9 @@ const listeEintraege: RegisterEintrag[] = [
     [{ gueltigAb: null, gueltigBis: DIENSTWAGEN_BATTERIEABZUG_BIS.datum, wert: "Abzug für das Batteriesystem, rechnet das Lohnbüro" }], DIENSTWAGEN_BATTERIEABZUG_BIS.quelle),
   ...(Object.keys(FEIERTAGE.laender) as (keyof typeof FEIERTAGE.laender)[]).map((l) => {
     const x = FEIERTAGE.laender[l];
-    const gelesen = l.startsWith("BY");
-    return eintrag(`feiertage.${l}`, { titel: `Feiertage ${x.name} zusätzlich`, gebiet: "Feiertage", norm: x.quelle, url: x.url, rhythmus: "Gesetz", ...(gelesen ? { p: G } : { k: true as const }) },
-      [{ gueltigAb: null, gueltigBis: null, wert: x.tage.map((t) => (t.ab ? `${t.name} (seit ${t.ab})` : t.name)).join(", ") }], x.quelle);
+    // Bayern am 10.10.2026, alle übrigen Länder am 29.10.2026 im amtlichen Landesportal im Wortlaut gelesen.
+    return eintrag(`feiertage.${l}`, { titel: `Feiertage ${x.name} zusätzlich`, gebiet: "Feiertage", norm: x.quelle, url: x.url, rhythmus: "Gesetz", p: l.startsWith("BY") ? G : P29 },
+      [{ gueltigAb: null, gueltigBis: null, wert: x.tage.map((t: FeiertagRegel) => (t.nurJahr ? `${t.name} (nur ${t.nurJahr})` : t.ab ? `${t.name} (seit ${t.ab})` : t.name)).join(", ") }], x.quelle);
   }),
 ];
 
@@ -432,10 +467,18 @@ function eintrag(id: string, a: Angabe, werte: Zeitwert[], quelle: string, besta
   const hinweis = a.befund ? `${quelle}. Befund: ${a.befund}` : quelle;
   const geprueftAm = a.p ?? null;
   const status: Status = a.k || !a.url || !geprueftAm || !bestaetigtInWerte ? "Kanzlei prüfen" : "bestätigt";
+  const grund: Grund | null = status === "bestätigt" ? null
+    : a.grund ?? (!a.url ? "keine Quelle" : a.k ? "Auslegung" : !bestaetigtInWerte && geprueftAm ? "Freigabe offen" : "nie geprüft");
   return {
     id, titel: a.titel, gebiet: a.gebiet, norm: a.norm, quelleUrl: a.url, hinweis, werte, rhythmus: a.rhythmus, stichtag: a.stichtag ?? null,
-    geprueftAm, naechstePruefung: naechstePruefungFuer(a.rhythmus, geprueftAm), status,
+    geprueftAm, naechstePruefung: naechstePruefungFuer(a.rhythmus, geprueftAm), status, grund,
   };
+}
+
+/** Steht ein ausstehender Wert mit eigenem `rotAb` im Eintrag, ist die Prüfung erst am Tag davor fällig (Bekanntgabe kommt gesetzlich später). */
+function mitRotAb(e: RegisterEintrag): RegisterEintrag {
+  const rotAb = e.werte.map((w) => w.rotAb).filter((d): d is string => !!d).sort().pop();
+  return rotAb && e.naechstePruefung < tagDavor(rotAb) ? { ...e, naechstePruefung: tagDavor(rotAb) } : e;
 }
 
 /** Das ganze Register: Werte aus WERTE, Zeitreihen, Aufbewahrung, Arbeitsschutz-Quoten und Feiertage. */
@@ -446,7 +489,7 @@ export const REGISTER: RegisterEintrag[] = [
     return eintrag(id, a, [{ gueltigAb: a.ab ?? null, gueltigBis: a.bis ?? null, wert: wertText(wert) }], wert.quelle, wert.bestaetigt !== false);
   }),
   ...REIHEN.map((x) => ({
-    ...eintrag(x.id, { titel: x.titel, gebiet: x.gebiet, norm: x.norm, url: x.quelleUrl, rhythmus: "jährlich", p: x.geprueftAm ?? undefined, k: x.k, stichtag: "01.01." }, x.werte, x.hinweis ?? ""),
+    ...mitRotAb(eintrag(x.id, { titel: x.titel, gebiet: x.gebiet, norm: x.norm, url: x.quelleUrl, rhythmus: "jährlich", p: x.geprueftAm ?? undefined, k: x.k, grund: x.grund, stichtag: "01.01." }, x.werte, x.hinweis ?? "")),
     ...(x.weitereQuellen && { weitereQuellen: x.weitereQuellen }), ...(x.pruefzahlen && { pruefzahlen: x.pruefzahlen }),
   })),
   ...listeEintraege,

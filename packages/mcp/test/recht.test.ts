@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { GRUND_TEXT } from "@/lib/regeln/register";
+import { RESSOURCEN } from "../src/ressourcen";
 import { rufe } from "./hilfe";
 
 describe("rechtswert", () => {
@@ -16,7 +18,17 @@ describe("rechtswert", () => {
   });
   it("eigene Annahmen von Lintelly (Rhythmus Lintelly) sind nicht öffentlich", () => {
     const alle = rufe("rechtswerte_suchen", { suchtext: "" }).ergebnis.anzahl_gesamt;
-    expect(alle).toBe(217);
+    expect(alle).toBe(218);
+  });
+});
+
+describe("Grund statt pauschal „noch nicht bestätigt“", () => {
+  it("Quelle und Ressource nennen den Grund aus dem Register", () => {
+    const q = rufe("rechtswert", { kennung: "mindesturlaub" }).quellen[0];
+    expect(q).toMatchObject({ status: "noch nicht bestätigt", grund: GRUND_TEXT.Umrechnung });
+    const r = JSON.parse(RESSOURCEN[0].lesen("2026-10-23")).werte.find((w: { kennung: string }) => w.kennung === "mindesturlaub");
+    expect(r.grund).toBe(GRUND_TEXT.Umrechnung);
+    expect(rufe("rechtswert", { kennung: "mindestlohn" }).quellen[0]).not.toHaveProperty("grund");
   });
 });
 

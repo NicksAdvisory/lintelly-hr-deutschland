@@ -24,6 +24,13 @@ Versionen nach SemVer. Jede Version geht über die Release-Pipeline auf npm, ghc
   - Urlaubsanspruch: Wechsel der Arbeitstage außerhalb des Beschäftigungszeitraums ist ein Fehler.
   - Stellenanzeige: keine Fehlalarme mehr bei „Kein Foto nötig“, „junge Familien“, „Kinder unter 12 Jahren“.
 
+### Werkbank-Stand 2f84bf6 (29.10.2026, Phase 2)
+
+- `arbeitgeberkosten` rechnet im Übergangsbereich (Midijob) den genauen Arbeitgeberanteil mit Faktor F (`lib/regeln/midijob.ts` der Werkbank, § 20 Abs. 2a SGB IV), mit Rechenweg und Quelle `faktorF`. Für Jahre ohne amtlichen Faktor F (2027) bleibt es bei der Untergrenze mit Hinweis.
+- Quellen, `rechtswerte_suchen` und die Ressource `rechtswerte` nennen zum Status den Grund aus dem Register (`grund`, z. B. „Gesetz nennt einen anderen Bezug, Umrechnung durch Lintelly, Kanzlei prüft“) statt nur „noch nicht bestätigt“.
+- Robustere rote Liste: `klausel_pruefen` findet jetzt auch die drei Fälle aus der Prüfung (Wettbewerbsverbot ohne Karenzentschädigung, Ausschlussfrist ohne Ausnahme, „Mit dem Gehalt sind etwaige Überstunden abgegolten“).
+- Kopierliste um `lib/regeln/midijob.ts`, `tests/midijob.test.ts` und `tests/vertragsbausteine/rote-liste.test.ts` ergänzt; Register mit 218 öffentlichen Werten.
+
 ### Korrekturen aus der Prüfung vom 29.10.2026
 
 - Daten müssen echte Kalendertage zwischen 1950 und 2100 sein. Vorher wurde 2026-02-30 weitergerechnet, und ein Ende ab 2199-12-31 ließ den Server endlos rechnen (Monatsschleife in `components/tools/datum.ts` der Website).

@@ -135,16 +135,16 @@ export const WERTE = {
   kschgTeilzeitFaktor: { bis20Std: { stunden: 20, faktor: 0.5 }, bis30Std: { stunden: 30, faktor: 0.75 }, quelle: "§ 23 Abs. 1 Satz 4 KSchG" },
   /** Pflichtplätze für schwerbehinderte Menschen: ab 20 Arbeitsplätzen 1, ab 40 zwei, ab 60 fünf Prozent (§ 154 Abs. 1 SGB IX). */
   pflichtplatzStufen: { ab: 20, zwei: 40, prozentAb: 60, prozent: 0.05, quelle: "§ 154 Abs. 1 SGB IX" },
-  /** Umlage U1 (Erstattung bei Krankheit): Arbeitgeber mit in der Regel nicht mehr als 30 Arbeitnehmern (§ 3 Abs. 1 AAG). Noch nicht von der Kanzlei bestätigt. */
+  /** Umlage U1 (Erstattung bei Krankheit): Arbeitgeber mit in der Regel nicht mehr als 30 Arbeitnehmern (§ 1 Abs. 1 AAG, Zählung § 3 Abs. 1 AAG). Noch nicht von der Kanzlei bestätigt. */
   /** Arbeitszeit in Schwangerschaft und Stillzeit (§ 4 Abs. 1, § 5 Abs. 1 MuSchG, für Frauen ab 18 Jahren): Tag, Doppelwoche, keine Arbeit zwischen 20 und 6 Uhr. */
   mutterschutzArbeitszeit: { tagStunden: 8.5, doppelwocheStunden: 90, nachtVonStunde: 20, nachtBisStunde: 6, bestaetigt: false, quelle: "§ 4 Abs. 1 und § 5 Abs. 1 MuSchG (gelesen auf gesetze-im-internet.de am 11.10.2026); Kanzlei bestätigen lassen" },
-  /** Übergangsbereich (Midijob): Lintelly rechnet die Formel aus § 20 Abs. 2a SGB IV nicht (Faktor F nur im Bundesanzeiger), sondern sagt "nicht berechnet". */
+  /** Übergangsbereich (Midijob): Obergrenze. Die Formel aus § 20 Abs. 2a SGB IV rechnet lib/regeln/midijob.ts mit FAKTOR_F (Formeln am 29.10.2026 im Wortlaut gelesen). */
   uebergangsbereich: { obergrenze: 2000, quelle: "§ 20 Abs. 2 SGB IV (Arbeitsentgelt aus mehr als geringfügiger Beschäftigung bis regelmäßig 2.000 Euro im Monat; Beiträge nach der Formel in § 20 Abs. 2a SGB IV, nicht für Auszubildende), gesetze-im-internet.de/sgb_4/__20.html, gelesen am 11.10.2026" },
   bavSvFrei: { anteil: 0.04, quelle: "§ 1 Abs. 1 Satz 1 Nr. 9 SvEV (steuerfreie Zuwendungen an Pensionskassen, Pensionsfonds, Direktversicherungen bis 4 Prozent der Beitragsbemessungsgrenze der Rentenversicherung sind beitragsfrei; gelesen auf gesetze-im-internet.de am 11.10.2026)" },
   pfaendungErklaerungWochen: { wert: 2, quelle: "§ 840 Abs. 1 ZPO (Erklärung des Drittschuldners binnen zwei Wochen ab Zustellung des Pfändungsbeschlusses, auf Verlangen des Gläubigers; gelesen auf gesetze-im-internet.de am 11.10.2026)" },
   praktikumMindestlohn: { monate: 3, quelle: "§ 22 Abs. 1 Satz 2 Nr. 2 und 3 MiLoG (Ausnahme vom Mindestlohn nur für Praktika bis zu drei Monaten; Pflichtpraktikum nach Nr. 1 ohne Grenze; gelesen auf gesetze-im-internet.de am 11.10.2026)" },
   umlageTeilzeitFaktor: { bis10Std: { stunden: 10, faktor: 0.25 }, bis20Std: { stunden: 20, faktor: 0.5 }, bis30Std: { stunden: 30, faktor: 0.75 }, quelle: "§ 3 Abs. 1 Satz 6 AAG (gelesen auf gesetze-im-internet.de am 11.10.2026)" },
-  umlageU1Grenze: { wert: 30, bestaetigt: false, quelle: "§ 3 Abs. 1 AAG (Arbeitgeber mit in der Regel nicht mehr als 30 Arbeitnehmern; Zählweise Kanzlei prüfen lassen)" },
+  umlageU1Grenze: { wert: 30, bestaetigt: false, quelle: "§ 1 Abs. 1 AAG (Arbeitgeber mit in der Regel nicht mehr als 30 Arbeitnehmern; Zählung nach § 3 Abs. 1 AAG, Zählweise Kanzlei prüfen lassen)" },
   /** Vergleichswert Krankenquote in Dashboards und Bericht. Keine amtliche Zahl, eine Annahme von Lintelly. */
   krankenquoteVergleich: { wert: 5.5, bestaetigt: false, quelle: "Vergleichswert von Lintelly, kein amtlicher Wert (Branchenwert bei der Krankenkasse oder Kanzlei erfragen)" },
   /** Teamwerte zur Gesundheit erst ab dieser Gruppengröße (Art. 5 Abs. 1 lit. c, Art. 9 DSGVO). Keine Zahl aus dem Gesetz, in den Einstellungen änderbar. */
@@ -379,6 +379,13 @@ export const SATZ_AV: ZeitWert[] = [
 export const MINIJOB_AG_PAUSCHALE: ZeitWert[] = [
   { gueltigAb: "2026-01-01", wert: 0.3, quelle: "§ 249b SGB V (13 %), § 172 Abs. 3 SGB VI (15 %), § 40a Abs. 2 EStG (2 % Pauschsteuer), ohne Umlagen; Lohnbüro bestätigen lassen" },
 ];
+/**
+ * Faktor F im Übergangsbereich (§ 20 Abs. 2a Satz 2 bis 4 SGB IV): 28 Prozent geteilt durch den Gesamtsozialversicherungsbeitragssatz des Jahres,
+ * auf vier Stellen gerundet, vom BMAS bis 31.12. für das Folgejahr im Bundesanzeiger bekannt gegeben. 2026 am 29.10.2026 im Wortlaut der Bekanntmachung gelesen.
+ */
+export const FAKTOR_F: ZeitWert[] = [
+  { gueltigAb: "2026-01-01", wert: 0.6619, quelle: "Bekanntmachung des Gesamtsozialversicherungsbeitragssatzes und des Faktors F für das Jahr 2026 vom 25.11.2025, BAnz AT 18.12.2025 B5 (Gesamtsatz 42,3 Prozent, Faktor F 0,6619), § 20 Abs. 2a SGB IV" },
+];
 export const SATZ_KV_PV: ZeitWert[] = [
   { gueltigAb: "2026-01-01", wert: 0.211, quelle: "§ 241 SGB V (14,6 %), durchschnittlicher Zusatzbeitrag 2,9 %, § 55 Abs. 1 SGB XI (3,6 %); Zusatzbeitrag und Pflegesatz vom Lohnbüro bestätigen lassen" },
 ];
@@ -387,10 +394,13 @@ export const SATZ_KV_PV: ZeitWert[] = [
  * Folgejahr ohne amtlichen Wert (Nachtprüfung 18.10. Nr. 12): kein geschätzter Wert, nur Quelle und erwarteter Termin. Der Registertest
  * warnt bis zum Prüftermin 15.11. und wird erst danach rot. Mit der Bekanntgabe den Wert in die Reihe eintragen und den Eintrag hier löschen.
  */
-export type Ausstehend = { gueltigAb: string; quelle: string; erwartet: string };
-export const AUSSTEHEND: Record<"satzRvAv" | "satzKvPv" | "minijobAgPauschale", Ausstehend> = {
+/** `rotAb`: Tag, ab dem der Registertest rot wird, wenn die amtliche Bekanntgabe später als der Prüftermin 15.11. kommen darf. */
+export type Ausstehend = { gueltigAb: string; quelle: string; erwartet: string; rotAb?: string };
+export const AUSSTEHEND: Record<"satzRvAv" | "satzKvPv" | "minijobAgPauschale" | "faktorF", Ausstehend> = {
   satzRvAv: { gueltigAb: "2027-01-01", quelle: "Beitragssatz der allgemeinen Rentenversicherung 2027: Rechtsverordnung der Bundesregierung mit Zustimmung des Bundesrates (§ 160 SGB VI, Anpassung nach § 158 SGB VI)", erwartet: "Verordnung im Herbst 2026" },
   satzKvPv: { gueltigAb: "2027-01-01", quelle: "Durchschnittlicher Zusatzbeitragssatz 2027: Bekanntgabe des Bundesministeriums für Gesundheit im Bundesanzeiger (§ 242a Abs. 2 SGB V); Pflegesatz nach § 55 SGB XI", erwartet: "Bundesanzeiger bis 01.11.2026" },
+  // Am 29.10.2026 geprüft: die BMAS-Seite zum Faktor F listet nur Bekanntmachungen bis 2026.
+  faktorF: { gueltigAb: "2027-01-01", quelle: "Faktor F 2027: Bekanntmachung des BMAS im Bundesanzeiger (§ 20 Abs. 2a Satz 4 SGB IV), folgt aus den Beitragssätzen 2027 und dem durchschnittlichen Zusatzbeitragssatz 2027", erwartet: "Bundesanzeiger bis 31.12.2026", rotAb: "2027-01-01" },
   // Gelesen am 23.10.2026 in BGBl. 2026 I Nr. 228 (Art. 1 Nr. 64, Inkrafttreten Art. 8 Abs. 2).
   minijobAgPauschale: { gueltigAb: "2027-01-01", quelle: "§ 249b Satz 1 SGB V in der Fassung von Art. 1 Nr. 64 des Gesetzes zur Stabilisierung der Beitragssätze in der gesetzlichen Krankenversicherung (BGBl. 2026 I Nr. 228, in Kraft 01.01.2027): Krankenversicherung mit dem allgemeinen Beitragssatz nach § 241 zuzüglich des durchschnittlichen Zusatzbeitragssatzes nach § 242a statt 13 %; Rentenversicherung und Pauschsteuer ändert das Gesetz nicht", erwartet: "mit dem durchschnittlichen Zusatzbeitragssatz 2027 (Bundesanzeiger bis 01.11.2026), Lohnbüro bestätigt" },
 };
@@ -496,7 +506,10 @@ export const jahreTextDativ = (n: number) => anzahl(n, "Jahr", "Jahren");
  * ohne überwiegend katholische Bevölkerung, Stadt Augsburg zusätzlich mit Friedensfest. Feiertage nur einzelner Gemeinden (Fronleichnam in
  * Teilen von Sachsen und Thüringen) fehlen, die Quelle sagt das.
  */
-export type FeiertagRegel = { name: string; fest?: readonly [number, number]; ostern?: number; bettag?: true; ab?: number };
+/** `nurJahr`: einmaliger Feiertag, gilt nur in diesem Jahr (z. B. Berlin 17.06.2028). */
+export type FeiertagRegel = { name: string; fest?: readonly [number, number]; ostern?: number; bettag?: true; ab?: number; nurJahr?: number };
+/** Gilt die Regel im Jahr y (ab einem Jahr, nur in einem Jahr)? */
+export const feiertagGiltIm = (t: FeiertagRegel, y: number) => (t.ab === undefined || y >= t.ab) && (t.nurJahr === undefined || y === t.nurJahr);
 const DREIKOENIG: FeiertagRegel = { name: "Heilige Drei Könige", fest: [1, 6] };
 const FRONLEICHNAM: FeiertagRegel = { name: "Fronleichnam", ostern: 60 };
 const MARIAE: FeiertagRegel = { name: "Mariä Himmelfahrt", fest: [8, 15] };
@@ -519,17 +532,17 @@ export const FEIERTAGE = {
     BY: { name: "Bayern", quelle: `${BAYERN_QUELLE}; Standard: mit Mariä Himmelfahrt`, url: "https://www.gesetze-bayern.de/Content/Document/BayFTG-1", tage: [DREIKOENIG, FRONLEICHNAM, MARIAE, ALLERHEILIGEN] },
     "BY-OHNE-MH": { name: "Bayern, Gemeinde ohne Mariä Himmelfahrt", quelle: `${BAYERN_QUELLE}; Gemeinde ohne überwiegend katholische Bevölkerung`, url: "https://www.gesetze-bayern.de/Content/Document/BayFTG-1", tage: [DREIKOENIG, FRONLEICHNAM, ALLERHEILIGEN] },
     "BY-AUGSBURG": { name: "Bayern, Stadt Augsburg", quelle: `${BAYERN_QUELLE}; Augsburger Hohes Friedensfest am 8. August nur im Stadtgebiet Augsburg (Art. 1 Abs. 2 Bayerisches Feiertagsgesetz)`, url: "https://www.gesetze-bayern.de/Content/Document/BayFTG-1", tage: [DREIKOENIG, FRONLEICHNAM, { name: "Augsburger Hohes Friedensfest", fest: [8, 8] }, MARIAE, ALLERHEILIGEN] },
-    BE: { name: "Berlin", quelle: "§ 1 Feiertagsgesetz Berlin (Internationaler Frauentag am 8. März, seit 2019)", url: "https://gesetze.berlin.de/bsbe/document/jlr-FeiertGBErahmen", tage: [{ name: "Internationaler Frauentag", fest: [3, 8], ab: 2019 }] },
+    BE: { name: "Berlin", quelle: "§ 1 Abs. 1 Feiertagsgesetz Berlin (Internationaler Frauentag am 8. März, seit 2019; einmalig der 17. Juni 2028, 75. Jahrestag des Aufstandes vom 17. Juni 1953, Nr. 11)", url: "https://gesetze.berlin.de/bsbe/document/jlr-FeiertGBErahmen", tage: [{ name: "Internationaler Frauentag", fest: [3, 8], ab: 2019 }, { name: "75. Jahrestag des Aufstandes vom 17. Juni 1953", fest: [6, 17], nurJahr: 2028 }] },
     BB: { name: "Brandenburg", quelle: "§ 2 Abs. 1 Feiertagsgesetz Brandenburg (Reformationstag)", url: "https://bravors.brandenburg.de/gesetze/ftg_2015", tage: [REFORMATION] },
-    HB: { name: "Bremen", quelle: "§ 1 Gesetz über die Sonn-, Gedenk- und Feiertage Bremen (Reformationstag seit 2018)", url: "https://www.transparenz.bremen.de/metainformationen/gesetz-ueber-die-sonn-gedenk-und-feiertage-vom-12-november-1954-111929", tage: [REFORMATION_2018] },
+    HB: { name: "Bremen", quelle: "§ 2 Abs. 1 Gesetz über die Sonn-, Gedenk- und Feiertage Bremen (Reformationstag seit 2018)", url: "https://www.transparenz.bremen.de/metainformationen/gesetz-ueber-die-sonn-gedenk-und-feiertage-vom-12-november-1954-296390?asl=bremen203_tpgesetz.c.55340.de&template=20_gp_ifg_meta_detail_d", tage: [REFORMATION_2018] },
     HH: { name: "Hamburg", quelle: "§ 1 Feiertagsgesetz Hamburg (Reformationstag seit 2018)", url: "https://www.landesrecht-hamburg.de/bsha/document/jlr-FeiertGHArahmen", tage: [REFORMATION_2018] },
-    HE: { name: "Hessen", quelle: "§ 1 Abs. 1 Hessisches Feiertagsgesetz (Fronleichnamstag)", url: "https://www.rv.hessenrecht.hessen.de/bshe/document/jlr-FeiertGHErahmen", tage: [FRONLEICHNAM] },
-    MV: { name: "Mecklenburg-Vorpommern", quelle: "§ 2 Abs. 1 Feiertagsgesetz Mecklenburg-Vorpommern (Internationaler Frauentag seit 2023, Reformationstag)", url: "https://www.landesrecht-mv.de/bsmv/document/jlr-FeiertGMVrahmen", tage: [{ name: "Internationaler Frauentag", fest: [3, 8], ab: 2023 }, REFORMATION] },
-    NI: { name: "Niedersachsen", quelle: "§ 2 Abs. 1 Niedersächsisches Gesetz über die Feiertage (Reformationstag seit 2018, Nds. GVBl. 2018 S. 123)", url: "https://www.landtag-niedersachsen.de/Drucksachen/Drucksachen%5F18%5F02500/00501-01000/18-00827.pdf", tage: [REFORMATION_2018] },
-    NW: { name: "Nordrhein-Westfalen", quelle: "§ 2 Abs. 1 Feiertagsgesetz Nordrhein-Westfalen (Fronleichnam, Allerheiligen)", url: "https://recht.nrw.de/lmi/owa/br_bes_text?anw_nr=2&gld_nr=1&ugl_nr=113&bes_id=3367&aufgehoben=N&menu=0", tage: [FRONLEICHNAM, ALLERHEILIGEN] },
+    HE: { name: "Hessen", quelle: "§ 1 Abs. 1 Hessisches Feiertagsgesetz (Fronleichnamstag)", url: "https://www.rv.hessenrecht.hessen.de/bshe/document/jlr-NNLHE000051B5", tage: [FRONLEICHNAM] },
+    MV: { name: "Mecklenburg-Vorpommern", quelle: "§ 2 Abs. 1 Feiertagsgesetz Mecklenburg-Vorpommern (Internationaler Frauentag seit 2023, Reformationstag)", url: "https://www.landesrecht-mv.de/bsmv/document/jlr-NNLMV00007A2F", tage: [{ name: "Internationaler Frauentag", fest: [3, 8], ab: 2023 }, REFORMATION] },
+    NI: { name: "Niedersachsen", quelle: "§ 2 Abs. 1 Niedersächsisches Gesetz über die Feiertage (Reformationstag seit 2018, Nds. GVBl. 2018 S. 123)", url: "https://voris.wolterskluwer-online.de/browse/document/f74bc6e7-6ded-3c2c-9afb-b34620456e56", tage: [REFORMATION_2018] },
+    NW: { name: "Nordrhein-Westfalen", quelle: "§ 2 Abs. 1 Feiertagsgesetz Nordrhein-Westfalen (Fronleichnam, Allerheiligen)", url: "https://recht.nrw.de/lrgv/gesetz/01012000-bekanntmachung-der-neufassung-des-gesetzes-ueber-die-sonn-und-feiertage/", tage: [FRONLEICHNAM, ALLERHEILIGEN] },
     RP: { name: "Rheinland-Pfalz", quelle: "§ 2 Abs. 1 Landesgesetz über den Schutz der Sonn- und Feiertage Rheinland-Pfalz (Fronleichnam, Allerheiligen)", url: "https://landesrecht.rlp.de/bsrp/document/jlr-FeiertGRPrahmen", tage: [FRONLEICHNAM, ALLERHEILIGEN] },
-    SL: { name: "Saarland", quelle: "§ 2 Abs. 1 Feiertagsgesetz Saarland (Fronleichnam, Mariä Himmelfahrt, Allerheiligen)", url: "https://recht.saarland.de/bssl/document/jlr-FeiertGSLrahmen", tage: [FRONLEICHNAM, MARIAE, ALLERHEILIGEN] },
-    SN: { name: "Sachsen", quelle: "§ 1 Sächsisches Sonn- und Feiertagsgesetz (Reformationstag, Buß- und Bettag; Fronleichnam nur in einzelnen Gemeinden laut Verordnung, hier nicht enthalten)", url: "https://www.revosax.sachsen.de/vorschrift/3622-Saechsisches-Sonn-und-Feiertagsgesetz", tage: [REFORMATION, { name: "Buß- und Bettag", bettag: true }] },
+    SL: { name: "Saarland", quelle: "§ 2 Abs. 1 Feiertagsgesetz Saarland (Fronleichnam, Mariä Himmelfahrt, Allerheiligen)", url: "https://recht.saarland.de/bssl/document/jlr-NNLSL0000A2D6", tage: [FRONLEICHNAM, MARIAE, ALLERHEILIGEN] },
+    SN: { name: "Sachsen", quelle: "§ 1 Sächsisches Sonn- und Feiertagsgesetz (Reformationstag, Buß- und Bettag; Fronleichnam nur in einzelnen Gemeinden laut Verordnung, hier nicht enthalten)", url: "https://www.revosax.sachsen.de/vorschrift/3997-SaechsSFG", tage: [REFORMATION, { name: "Buß- und Bettag", bettag: true }] },
     ST: { name: "Sachsen-Anhalt", quelle: "§ 2 Feiertagsgesetz Sachsen-Anhalt (Heilige Drei Könige, Reformationstag)", url: "https://www.landesrecht.sachsen-anhalt.de/bsst/document/jlr-FeiertGSTrahmen", tage: [DREIKOENIG, REFORMATION] },
     SH: { name: "Schleswig-Holstein", quelle: "§ 2 Abs. 1 Sonn- und Feiertagsgesetz Schleswig-Holstein (Reformationstag seit 2018)", url: "https://www.gesetze-rechtsprechung.sh.juris.de/bssh/document/jlr-FeiertGSH2004rahmen", tage: [REFORMATION_2018] },
     TH: { name: "Thüringen", quelle: "§ 2 Abs. 1 Thüringer Feiertagsgesetz (Weltkindertag seit 2019, Reformationstag; Fronleichnam nur in einzelnen Gemeinden, hier nicht enthalten)", url: "https://landesrecht.thueringen.de/bsth/document/jlr-FeiertGTHrahmen", tage: [{ name: "Weltkindertag", fest: [9, 20], ab: 2019 }, REFORMATION] },

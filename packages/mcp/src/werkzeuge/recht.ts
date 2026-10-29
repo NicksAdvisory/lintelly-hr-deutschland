@@ -66,7 +66,7 @@ const rechtswerte_suchen: Werkzeug = {
     const passend = OEFFENTLICH.filter((x) => (!e.gebiet || x.gebiet === e.gebiet)
       && woerter.every((w) => `${x.id} ${x.titel} ${x.gebiet} ${x.norm} ${x.hinweis}`.toLowerCase().includes(w)));
     const treffer = passend.slice(0, 20).map((x) => ({
-      kennung: x.id, titel: x.titel, gebiet: x.gebiet, wert: wertAm(x, tag)?.wert ?? null, norm: x.norm, status: registerQuelle(x.id, heute).status,
+      kennung: x.id, titel: x.titel, gebiet: x.gebiet, wert: wertAm(x, tag)?.wert ?? null, norm: x.norm, status: registerQuelle(x.id, heute).status, grund: registerQuelle(x.id, heute).grund,
     }));
     return antwort({
       ergebnis: { stichtag: tag, anzahl_gesamt: OEFFENTLICH.length, anzahl_treffer: passend.length, treffer },

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { abgabenArbeitgeber } from "../../kern/website/components/tools/minijob-logik";
 import { mindestlohnLuecke } from "@/lib/regeln/mindestlohn";
+import { midijob } from "@/lib/regeln/midijob";
 import { rufe } from "./hilfe";
 
 describe("arbeitgeberkosten", () => {
@@ -16,10 +17,19 @@ describe("arbeitgeberkosten", () => {
     const e = rufe("arbeitgeberkosten", { art: "vollzeit", brutto_monat: 9000, stichtag: "2026-11-01" }).ergebnis;
     expect(e.posten.map((p: { basis: number; betrag: number }) => [p.basis, p.betrag])).toEqual([[5812.5, 613.22], [8450, 895.7]]);
   });
-  it("Teilzeit 1.800 € liegt im Übergangsbereich: nur Untergrenze, kein geschätzter Wert", () => {
+  it("Teilzeit 1.800 € im Übergangsbereich 2026: genauer Arbeitgeberanteil mit Faktor F, wie midijob() der Werkbank", () => {
     const a = rufe("arbeitgeberkosten", { art: "teilzeit", brutto_monat: 1800, stichtag: "2026-11-01" });
-    expect(a.ergebnis).toMatchObject({ uebergangsbereich: true, summe_arbeitgeber: null, mindestens_arbeitgeber: 380.7 });
-    expect(a.fallen.join(" ")).toMatch(/§ 20 Abs\. 2a SGB IV/);
+    const m = midijob(1800, "2026-11-01");
+    if (!m.berechnet) throw new Error(m.grund);
+    expect(a.ergebnis).toMatchObject({ uebergangsbereich: true, faktor_f: m.faktorF, summe_arbeitgeber: m.arbeitgeber, gesamtkosten_monat: 1800 + m.arbeitgeber });
+    expect(m.arbeitgeber).toBeGreaterThan(380.7);
+    expect(a.rechenweg).toEqual(m.rechenweg);
+    expect(a.quellen.map((q) => q.norm).join(" ")).toMatch(/§ 20 Abs\. 2a SGB IV/);
+  });
+  it("Übergangsbereich 2027 ohne amtlichen Faktor F: Untergrenze mit ehrlichem Hinweis", () => {
+    const a = rufe("arbeitgeberkosten", { art: "teilzeit", brutto_monat: 1800, stichtag: "2027-02-01" });
+    expect(a.ergebnis).toMatchObject({ uebergangsbereich: true, summe_arbeitgeber: null });
+    expect(a.fallen.join(" ")).toMatch(/Genauer Anteil nicht berechnet: Faktor F für 2027/);
   });
   it("Minijob rechnet wie der Minijob-Rechner auf lintelly.com", () => {
     const e = rufe("arbeitgeberkosten", { art: "minijob", brutto_monat: 603, stichtag: "2026-11-01" }).ergebnis;

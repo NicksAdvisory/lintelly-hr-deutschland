@@ -57,6 +57,13 @@ describe("klausel_pruefen", () => {
     expect(a.ergebnis.treffer[0].alternative).toMatch(/C2/);
     expect(a).not.toHaveProperty("lintelly");
   });
+  it.each([
+    ["R1", "Der Arbeitnehmer verpflichtet sich, für die Dauer von zwei Jahren nach Beendigung des Arbeitsverhältnisses nicht für ein Konkurrenzunternehmen tätig zu werden."],
+    ["R6", "Alle Ansprüche aus dem Arbeitsverhältnis verfallen, wenn sie nicht innerhalb von drei Monaten nach Fälligkeit schriftlich geltend gemacht werden."],
+    ["R4", "Mit dem Gehalt sind etwaige Überstunden abgegolten."],
+  ])("Befund 29.10.2026 Punkt 3: %s trifft auch ohne Schlüsselwort in der Beschreibung", (kennung, klausel) => {
+    expect(rufe("klausel_pruefen", { klausel }).ergebnis.treffer.map((t: { kennung: string }) => t.kennung)).toContain(kennung);
+  });
   it("ohne Treffer sagt die Antwort, dass das keine Prüfung der Wirksamkeit ist", () => {
     const a = rufe("klausel_pruefen", { klausel: "Der Arbeitsort ist Frankfurt am Main." });
     expect(a.ergebnis.treffer).toEqual([]);
