@@ -14,12 +14,16 @@ describe("schwellen_check", () => {
     expect(a.ergebnis.ab_dem_ersten_beschaeftigten.length).toBeGreaterThan(5);
   });
   it("Schwerbehinderte nur unter den Arbeitnehmern ohne Azubis", () => {
-    expect(rufe("schwellen_check", { koepfe: 2, azubis: 3, schwerbehinderte: 3 }).ergebnis.fehler).toMatch(/ohne Azubis/);
-    expect(rufe("schwellen_check", { koepfe: 31, azubis: 1, schwerbehinderte: 1 }).ergebnis.fehler).toBeUndefined();
+    expect(() => rufe("schwellen_check", { koepfe: 2, azubis: 3, schwerbehinderte: 3 })).toThrow(/ohne Azubis/);
+    expect(rufe("schwellen_check", { koepfe: 31, azubis: 1, schwerbehinderte: 1 }).ergebnis.gilt.length).toBeGreaterThan(0);
   });
   it("Teilzeit über der Gesamtzahl und halbe Köpfe sind Fehler", () => {
-    expect(rufe("schwellen_check", { koepfe: 3, teilzeit_bis_10_stunden: 2, teilzeit_11_bis_20_stunden: 2 }).ergebnis.fehler).toMatch(/Teilzeit/);
-    expect(rufe("schwellen_check", { koepfe: 2.5 }).ergebnis.fehler).toMatch(/Ganze Zahl/);
+    expect(() => rufe("schwellen_check", { koepfe: 3, teilzeit_bis_10_stunden: 2, teilzeit_11_bis_20_stunden: 2 })).toThrow(/Teilzeit/);
+    expect(() => rufe("schwellen_check", { koepfe: 2.5 })).toThrow(/koepfe muss eine ganze Zahl sein/);
+  });
+  it("21 bis 49 Beschäftigte: Sicherheitsbeauftragter bei besonderer Gefährdung (§ 22 Abs. 1 Satz 3 SGB VII)", () => {
+    expect(rufe("schwellen_check", { koepfe: 25 }).fallen.join(" ")).toMatch(/§ 22 Abs\. 1 Satz 3 SGB VII/);
+    expect(rufe("schwellen_check", { koepfe: 15 }).fallen.join(" ")).not.toMatch(/§ 22/);
   });
   it("5 Köpfe: Betriebsrat möglich, kein Hinweis auf Lintelly", () => {
     const a = rufe("schwellen_check", { koepfe: 5 });
@@ -59,11 +63,17 @@ describe("sonderkuendigungsschutz_check", () => {
     expect(a.ergebnis.treffer[0].zustaendig).toMatch(/Aufsichtsbehörde/);
     expect(a.quellen.map((q) => q.norm)).toContain("§ 17 MuSchG");
   });
-  it("nichts beantwortet: grün, aber offene Fragen und immer der Hinweis auf menschliche Prüfung", () => {
+  it("nichts beantwortet: nicht grün, sondern gelb mit allen offenen Fragen (Review 29.10.2026)", () => {
     const a = rufe("sonderkuendigungsschutz_check", {});
-    expect(a.ergebnis).toMatchObject({ ergebnis: "Kein Sonderschutz erkennbar", ampel: "gruen", offene_fragen: 11 });
-    expect(a.fallen!.join(" ")).toMatch(/als „nein“/);
+    expect(a.ergebnis).toMatchObject({ ergebnis: "Noch nicht vollständig, 11 Fragen offen", ampel: "gelb", offene_fragen: 11 });
+    expect(a.fallen!.join(" ")).toMatch(/11 Fragen sind offen: mutterschutz, elternzeit/);
     expect(a).not.toHaveProperty("lintelly");
+  });
+  it("alle Fragen nein: grün; eine offen: gelb mit 1 Frage offen", () => {
+    const nein = Object.fromEntries(["mutterschutz", "elternzeit", "pflege", "betriebsrat", "wahl", "schwerbehindert", "dsb", "azubi", "beauftragte", "wehrdienst", "hinweisgeber"].map((k) => [k, "nein"]));
+    expect(rufe("sonderkuendigungsschutz_check", nein).ergebnis).toMatchObject({ ampel: "gruen", ergebnis: "Kein Sonderschutz erkennbar", offene_fragen: 0 });
+    const { wehrdienst: _w, ...ohne } = nein;
+    expect(rufe("sonderkuendigungsschutz_check", ohne).ergebnis).toMatchObject({ ampel: "gelb", ergebnis: "Noch nicht vollständig, 1 Frage offen" });
   });
   it("mit Betriebsrat: Anhörung vor jeder Kündigung", () => {
     expect(rufe("sonderkuendigungsschutz_check", { betriebsrat_vorhanden: "ja" }).naechster_schritt!.join(" ")).toMatch(/§ 102 BetrVG/);
@@ -89,14 +99,14 @@ describe("bem_pflicht", () => {
   it("noch keine Pflicht: Wiedervorlage in einem Monat merken", () => {
     const a = rufe("bem_pflicht", { stichtag: "2026-10-01", zeitraeume: [{ von: "2026-09-01", bis: "2026-09-10" }] });
     expect(a.ergebnis).toMatchObject({ bem_pflicht: false, bis_zur_grenze: "noch 23 Arbeitstage" });
-    expect(a.naechster_schritt!.join(" ")).toMatch(/Frist merken: Werkzeug frist_merken.*01\.11\.2026/);
+    expect(a.naechster_schritt!.join(" ")).toMatch(/Frist merken: Werkzeug frist_merken.*2026-11-01/);
   });
   it("3-Tage-Woche: Grenze nach Arbeitstagen ist 18", () => {
     const a = rufe("bem_pflicht", { stichtag: "2026-10-01", zeitraeume: [{ von: "2026-09-01", bis: "2026-09-10" }], arbeitstage: ["Mo", "Mi", "Fr"] });
     expect(a.ergebnis.grenze_arbeitstage).toBe(18);
   });
   it("Ende vor Beginn ist ein Fehler, Beginn nach dem Stichtag zählt nicht", () => {
-    expect(rufe("bem_pflicht", { stichtag: "2026-10-01", zeitraeume: [{ von: "2026-05-10", bis: "2026-05-01" }] }).ergebnis.fehler).toMatch(/vor dem Beginn/);
+    expect(() => rufe("bem_pflicht", { stichtag: "2026-10-01", zeitraeume: [{ von: "2026-05-10", bis: "2026-05-01" }] })).toThrow(/vor dem Beginn/);
     const a = rufe("bem_pflicht", { stichtag: "2026-10-01", zeitraeume: [{ von: "2026-09-01", bis: "2026-09-10" }, { von: "2026-10-05", bis: "2026-10-09" }] });
     expect(a.ergebnis.au_kalendertage).toBe(10);
     expect(a.fallen!.join(" ")).toMatch(/nach dem Stichtag/);

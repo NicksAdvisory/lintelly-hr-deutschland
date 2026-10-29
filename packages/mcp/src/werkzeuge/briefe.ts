@@ -3,11 +3,12 @@
  * (components/tools/kuendigungsschreiben-generator.tsx, abmahnung-generator.tsx, lib/ki/batch-2.ts). Namen und Anschriften
  * bleiben Platzhalter, die Claude oder ChatGPT mit den Angaben des Nutzers füllt. Vor dem Versand prüft ein Mensch (Nick 23.10.2026).
  */
-import { berechneKuendigung, formatDE, isISODate, REGEL_GRUNDFRIST, REGEL_PROBEZEIT, STAFFEL_622, type FristRegel, type KuendigungsErgebnis } from "@/lib/regeln/datum";
+import { berechneKuendigung, formatDE, isISODate, REGEL_GRUNDFRIST, REGEL_PROBEZEIT, STAFFEL_622, type KuendigungsErgebnis } from "@/lib/regeln/datum";
 import { WERTE, fristWort, monateText, zahlwort } from "@/lib/regeln/werte";
-import { antwort, normQuelle, registerQuelle } from "../antwort";
-import { datum, janein, schema, text, zahl } from "../eingabe";
+import { antwort, fehler, normQuelle, registerQuelle } from "../antwort";
+import { datum, ganzzahl, janein, schema, text, zahl } from "../eingabe";
 import type { Werkzeug } from "../werkzeug";
+import { ohneProbezeitHinweis, PROBEZEIT_FELD, REGEL_WERT } from "./kuendigung";
 
 const LINIE = "______________________________";
 const ADRESSE = ["[Straße Hausnummer]", "[PLZ Ort]"];
@@ -45,11 +46,6 @@ const PRUEFLISTE_KUENDIGUNG = [
   `Ab Zugang hat die Person ${WERTE.kschgKlageWochen.wert} Wochen Zeit für eine Kündigungsschutzklage (§ 4 KSchG).`,
   "Der Brief weist auf die Pflicht hin, sich bei der Agentur für Arbeit arbeitsuchend zu melden (§ 38 Abs. 1 SGB III). Diesen Hinweis sollst du geben (§ 2 Abs. 2 Satz 2 Nr. 3 SGB III), lass ihn drin.",
 ];
-
-/** Rechtswert im Register zur gesetzlichen Fristregel. */
-const REGEL_WERT: Record<Exclude<FristRegel["art"], "vertrag">, string> = {
-  probezeit: "probezeitKuendigungTage", grundfrist: "grundkuendigungsfristTage", kleinbetrieb: "kleinbetriebKuendigung", staffel: "kuendigungsStaffel",
-};
 
 /** Text wie baueKuendigung im Kündigungsschreiben-Generator, ohne Namen. */
 function kuendigungsbrief(b: { sie: boolean; ende: string; datum?: string; freistellung: Freistellung; freistellungAb?: string; resturlaub?: number; betriebsrat: boolean; rueckgabe: boolean; bote: boolean; zusatz: string }): string {
@@ -99,9 +95,9 @@ const kuendigungsschreiben: Werkzeug = {
   eingabe: schema({
     eintritt: datum("First day of employment (Eintritt); apprenticeship in the same company counts"),
     zugang: datum("Day the employee receives the signed original (Zugang), not the date of the letter"),
-    probezeit_monate: zahl("Agreed probation in whole months (Probezeit), 0 = none, default 6 as on lintelly.com; ask if unsure", 0, 12),
+    probezeit_monate: PROBEZEIT_FELD,
     vertragsfrist: text("Longer notice period agreed in the contract (Vertrag), default keine", { enum: ["keine", "monatsende", "quartalsende"] }),
-    vertragsfrist_monate: zahl("Months of that contractual notice period, default 3", 1, 12),
+    vertragsfrist_monate: ganzzahl("Whole months of that contractual notice period, default 3", 1, 12),
     kleinbetrieb_vier_wochen: janein(`At most ${WERTE.kleinbetriebKuendigung.hoechstBeschaeftigte} employees and the contract agrees ${WERTE.kleinbetriebKuendigung.tage / 7} weeks without a fixed end date (§ 622 Abs. 5 BGB)`),
     tarifvertrag: janein("A collective agreement (Tarifvertrag) applies; its periods are not calculated"),
     ausbildung: janein("Apprenticeship (Ausbildungsverhältnis); the template does not fit then"),
@@ -117,18 +113,14 @@ const kuendigungsschreiben: Werkzeug = {
   }, ["eintritt", "zugang"]),
   ausfuehren(e, heute) {
     const k = e as KuendigungEingabe;
-    const pz = k.probezeit_monate ?? 6; // Vorgabe der Seite
     const vm = k.vertragsfrist_monate ?? 3;
     const vertrag = k.vertragsfrist ?? "keine";
     const freistellung = k.freistellung ?? "keine";
-    const fehler = (text: string) => antwort({ ergebnis: { fehler: text } }, heute);
-    if (!Number.isInteger(pz)) return fehler("Probezeit in ganzen Monaten angeben, 0 bis 12.");
-    if (!Number.isInteger(vm)) return fehler("Vertragliche Frist in ganzen Monaten angeben, 1 bis 12.");
     if (isISODate(k.briefdatum) && k.zugang < k.briefdatum) return fehler("Zugang liegt vor dem Datum des Schreibens.");
     let r: KuendigungsErgebnis;
     try {
       r = berechneKuendigung({
-        eintritt: k.eintritt, zugang: k.zugang, kuendigender: "arbeitgeber", probezeitMonate: pz, kleinbetriebVierWochen: k.kleinbetrieb_vier_wochen,
+        eintritt: k.eintritt, zugang: k.zugang, kuendigender: "arbeitgeber", probezeitMonate: k.probezeit_monate, kleinbetriebVierWochen: k.kleinbetrieb_vier_wochen,
         vertrag: vertrag === "keine" ? null : { monate: vm, termin: vertrag }, tarifvertrag: k.tarifvertrag,
       });
     } catch (x) {
@@ -147,6 +139,7 @@ const kuendigungsschreiben: Werkzeug = {
     const freiNachEnde = freistellung !== "keine" && isISODate(k.freistellung_ab) && k.freistellung_ab > r.ende;
     const fallen = [
       ...(freiNachEnde ? ["Die Freistellung beginnt nach dem Ende des Arbeitsverhältnisses. Prüf das Datum."] : []),
+      ...ohneProbezeitHinweis(k),
       ...r.hinweise.map((h) => h.text),
       "Keine Begründung in den Brief, sie ist für die ordentliche Kündigung nicht nötig. Fristlose Kündigungen bildet die Vorlage nicht ab.",
     ];

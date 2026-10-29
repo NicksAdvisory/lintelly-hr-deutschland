@@ -37,6 +37,10 @@ describe("rechtsaenderungen", () => {
     const m = a.ergebnis.aenderungen.find((x: { kennung: string }) => x.kennung === "mindestlohn");
     expect(m).toMatchObject({ ab: "2027-01-01", neu: "14,60 €", vorher: "13,90 €" });
   });
+  it("gleicher Wert mit neuem Datum ist keine Änderung (2,6 % statt 2,6 %)", () => {
+    const a = rufe("rechtsaenderungen", { von: "2027-01-01", bis: "2027-01-01" });
+    expect(a.ergebnis.aenderungen.filter((x: { neu: string; vorher: string }) => x.neu === x.vorher)).toEqual([]);
+  });
   it("noch ausstehende Werte werden genannt, nicht geschätzt", () => {
     const a = rufe("rechtsaenderungen", { von: "2027-01-01", bis: "2027-01-01" });
     expect(a.ergebnis.ausstehend.map((x: { kennung: string }) => x.kennung)).toEqual(expect.arrayContaining(["satzKvPv"]));

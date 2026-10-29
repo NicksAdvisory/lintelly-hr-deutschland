@@ -1,18 +1,17 @@
 /**
  * Pflichten aus den Rechnern von lintelly.com/tools: Schwellenwerte, Sonderkündigungsschutz, BEM.
  * Gerechnet wird nur mit der Logik der Website (packages/kern/website/components/tools/*-logik.ts), Texte und Warnungen
- * folgen den Seiten. Fehlerhafte Angaben kommen als ergebnis.fehler zurück, nicht als Zahl.
+ * folgen den Seiten. Fehlerhafte Angaben kommen als Fehler zurück (isError), nicht als Zahl.
  */
 import { AB_EINS, fehltText, gewichtet, gewichtetU1, pruefe, pruefeSwEingabe, REGELN, SW_FELDER, type Regel, type Status, type SwFeld } from "../../../kern/website/components/tools/schwellenwerte-logik";
-import { auswerten, SCHUTZ, type Antwort, type Stufe } from "../../../kern/website/components/tools/sonderkuendigungsschutz-logik";
+import { auswerten, SCHUTZ, stand, type Antwort, type Stufe } from "../../../kern/website/components/tools/sonderkuendigungsschutz-logik";
 import { abstandText, berechneBem, hochrechnung, TAGE } from "../../../kern/website/components/tools/bem-logik";
 import { addMonthsDay, fmtDay, fromDay, toDay, weekdayDay } from "../../../kern/website/components/tools/datum";
 import { plural, zahl as dz } from "../../../kern/website/components/tools/format";
-import { antwort, normQuelle, registerQuelle, type Quelle } from "../antwort";
-import { datum, janein, liste, schema, text, zahl } from "../eingabe";
+import { antwort, fehler, normQuelle, registerQuelle, type Quelle } from "../antwort";
+import { datum, ganzzahl, janein, liste, schema, text } from "../eingabe";
 import type { Werkzeug } from "../werkzeug";
 
-const fehler = (meldung: string, heute: string) => antwort({ ergebnis: { fehler: meldung } }, heute);
 
 /* ---------- Schwellenwerte ---------- */
 
@@ -42,7 +41,7 @@ const zeile = (x: Treffer, voll: boolean, ohneAngabe = false) => ({
   folge: voll ? x.r.folge : x.r.folge.split(". ")[0].replace(/\.?$/, "."),
 });
 
-const anzahl = (description: string) => zahl(description, 0, 100000);
+const anzahl = (description: string) => ganzzahl(description, 0, 100000);
 
 const schwellen_check: Werkzeug = {
   name: "schwellen_check",
@@ -64,7 +63,7 @@ const schwellen_check: Werkzeug = {
   ausfuehren(e, heute) {
     const formular = Object.fromEntries(SW_FELDER.map((k) => [k, e[FELD[k]] === undefined ? "" : String(e[FELD[k]])])) as Record<SwFeld, string>;
     const p = pruefeSwEingabe(formular, !!e.betriebsrat);
-    if (!p.ok) return fehler(Object.entries(p.fehler).map(([k, m]) => `${FELD[k as SwFeld]}: ${m}`).join(" "), heute);
+    if (!p.ok) return fehler(Object.entries(p.fehler).map(([k, m]) => `${FELD[k as SwFeld]}: ${m}`).join(" "));
     const s = p.e;
     const res: Treffer[] = REGELN.map((r) => ({ r, ...pruefe(r, s) }));
     const gilt = res.filter((x) => x.status === "gilt" || x.status === "bisGrenze");
@@ -74,6 +73,8 @@ const schwellen_check: Werkzeug = {
     const plaetze = s.plaetze18 ?? Math.max(0, s.koepfe - s.bis10 - s.bis20);
     const pflichtplaetze = plaetze < 20 ? 0 : plaetze < 40 ? 1 : plaetze < 60 ? 2 : Math.floor(plaetze * 0.05) + ((plaetze * 0.05) % 1 >= 0.5 ? 1 : 0);
     const quelle = (r: Regel): Quelle => (REGISTER_ID[r.id] ? registerQuelle(REGISTER_ID[r.id], heute) : normQuelle(r.gesetz));
+    // § 22 Abs. 1 Satz 3 SGB VII: 21 bis 49 Beschäftigte (Köpfe mit Azubis) bei besonderer Gefährdung ein Sicherheitsbeauftragter
+    const sibe = s.koepfe + s.azubis > 20 && s.koepfe + s.azubis < 50;
     return antwort({
       ergebnis: {
         koepfe_gesamt: s.koepfe + s.azubis,
@@ -91,13 +92,14 @@ const schwellen_check: Werkzeug = {
         `Gewichtet nach § 3 AAG für die U1 (bis 10 Std. 0,25, bis 20 Std. 0,5, bis 30 Std. 0,75, ohne Azubis und schwerbehinderte Menschen): ${dz(gewichtetU1(s))}.`,
         `Jede Schwelle zählt nach ihrem Gesetz (zaehlweise je Zeile). ${gilt.length} von ${REGELN.length} geprüften Schwellen treffen zu.`,
       ],
-      quellen: [...gilt.map((x) => x.r), ...(naechste ? [naechste.r] : [])].map(quelle),
+      quellen: [...[...gilt.map((x) => x.r), ...(naechste ? [naechste.r] : [])].map(quelle), ...(sibe ? [normQuelle("§ 22 Abs. 1 Satz 3 SGB VII")] : [])],
       fallen: [
         "Maßgeblich ist die Zahl, die in der Regel beschäftigt ist, kein Stichtag. Liegst du knapp an einer Schwelle, lass die Zählung prüfen.",
         "Manche Schwellen zählen je Betrieb (Standort mit eigener Personalleitung), andere für das ganze Unternehmen. Bei mehreren Standorten prüf die Betriebs-Zeilen je Standort. Leiharbeitskräfte auf Stammplätzen zählen bei einigen Schwellen mit, etwa beim KSchG und im BetrVG.",
         ...(s.datenPersonen === null ? ["Für den Datenschutzbeauftragten fehlt die Zahl der Personen, die ständig mit Personendaten am Rechner arbeiten (personen_mit_personendaten)."] : []),
         ...(pflichtplaetze && s.plaetze18 === null ? ["Die Zahl der Arbeitsplätze ab 18 Stunden ist geschätzt (alle über 20 Stunden). Wer 18 bis 20 Stunden arbeitet, zählt mit."] : []),
         ...(s.schwerbehindert ? ["Für die U1-Zählung ist je schwerbehinderter Person ein voller Kopf abgezogen, bei Teilzeit ist das etwas zu viel."] : []),
+        ...(sibe ? ["Sicherheitsbeauftragte schon unter 50: Mit regelmäßig mehr als 20 und weniger als 50 Beschäftigten bestellst du einen, wenn die Gefährdungsbeurteilung eine besondere Gefährdung für Leben und Gesundheit ergibt, etwa im Handwerk oder auf dem Bau (§ 22 Abs. 1 Satz 3 SGB VII)."] : []),
       ],
       naechster_schritt: [
         ...(naechste
@@ -130,28 +132,29 @@ const FRAGE: Record<string, string> = {
   wehrdienst: "Has the person received a call-up notice or is doing military service or a military exercise?",
   hinweisgeber: "Has the person recently reported a violation (whistleblowing), internally or to an external reporting channel?",
 };
-const antwortFeld = (frage: string) => text(`${frage} Answer ja, nein or unklar; not answered counts as nein.`, { enum: ANTWORTEN });
+const antwortFeld = (frage: string, ohne = "Unanswered questions stay open, the result is then not green") => text(`${frage} Answer ja, nein or unklar. ${ohne}.`, { enum: ANTWORTEN });
 
 const sonderkuendigungsschutz_check: Werkzeug = {
   name: "sonderkuendigungsschutz_check",
   titel: "Sonderkündigungsschutz prüfen",
   beschreibung:
-    "Special protection against dismissal under German law (Sonderkündigungsschutz): checks 11 grounds such as pregnancy, parental leave, care leave, works council, severe disability, data protection officer, apprentices and whistleblowers. Returns a traffic light, the authority whose consent is needed, the protected period and the steps before giving notice. Use it before any dismissal, also in small businesses. Germany only.",
+    `Special protection against dismissal under German law (Sonderkündigungsschutz): checks ${SCHUTZ.length} grounds such as pregnancy, parental leave, care leave, works council, severe disability, data protection officer, apprentices and whistleblowers. Returns a traffic light, the authority whose consent is needed, the protected period and the steps before giving notice. Use it before any dismissal, also in small businesses. Germany only.`,
   eingabe: schema({
     ...Object.fromEntries(SCHUTZ.map((s) => [s.id, antwortFeld(FRAGE[s.id] ?? s.frage)])),
-    laenger_als_6_monate: antwortFeld("Only for severe disability: has the employment lasted more than 6 months without interruption? Default ja."),
-    betriebsrat_vorhanden: antwortFeld("Is there a works council (Betriebsrat) in the business? Default nein."),
+    laenger_als_6_monate: antwortFeld("Only for severe disability: has the employment lasted more than 6 months without interruption?", "If left out, ja is assumed"),
+    betriebsrat_vorhanden: antwortFeld("Is there a works council (Betriebsrat) in the business?", "If left out, nein is assumed"),
   }),
   ausfuehren(e, heute) {
     const treffer = auswerten(e as Record<string, Antwort>, (e.laenger_als_6_monate as Antwort | undefined) ?? "ja");
     const offen = SCHUTZ.filter((s) => !e[s.id]).length;
     const rot = treffer.filter((t) => t.effektiv !== "pruefen").length, gelb = treffer.length - rot;
+    // Grün erst, wenn alle Fragen beantwortet sind (lintelly.com 28.10.2026). Offene Fragen ohne Treffer sind hier gelb, nicht „aus“.
+    const gesamt = stand(treffer, offen);
     const br = (e.betriebsrat_vorhanden as Antwort | undefined) ?? "nein";
     return antwort({
       ergebnis: {
-        // Treffer sind nach Schwere sortiert, der erste gibt die Überschrift
-        ergebnis: treffer.length ? BEDEUTUNG[treffer[0].effektiv] : "Kein Sonderschutz erkennbar",
-        ampel: rot ? "rot" : gelb ? "gelb" : "gruen",
+        ergebnis: gesamt.titel,
+        ampel: gesamt.ampel === "aus" ? "gelb" : gesamt.ampel,
         rot,
         gelb,
         offene_fragen: offen,
@@ -167,7 +170,7 @@ const sonderkuendigungsschutz_check: Werkzeug = {
           schritte: t.schritte,
         })),
       },
-      rechenweg: [`${SCHUTZ.length} Schutzgründe geprüft, ${treffer.length} treffen zu: ${rot} rot, ${gelb} gelb. Rot heißt: ohne Zustimmung keine Kündigung oder ordentliche Kündigung ausgeschlossen. Gelb heißt: vor der Kündigung klären.`],
+      rechenweg: [`${SCHUTZ.length} Schutzgründe, ${SCHUTZ.length - offen} beantwortet, ${treffer.length} treffen zu: ${rot} rot, ${gelb} gelb. Rot heißt: ohne Zustimmung keine Kündigung oder ordentliche Kündigung ausgeschlossen. Gelb heißt: vor der Kündigung klären oder Fragen offen.`],
       quellen: [
         ...treffer.map((t) => normQuelle(t.grundlage)),
         ...(treffer.some((t) => t.id === "schwerbehindert") ? [registerQuelle("schwerbehindertKuendigung", heute)] : []),
@@ -175,7 +178,7 @@ const sonderkuendigungsschutz_check: Werkzeug = {
         normQuelle("§ 623 BGB"),
       ],
       fallen: [
-        ...(treffer.length === 0 && offen ? [`${offen} Fragen sind nicht beantwortet und zählen als „nein“. Prüf sie, bevor du dich auf das Ergebnis verlässt.`] : []),
+        ...(offen ? [`${offen === 1 ? "1 Frage ist" : `${offen} Fragen sind`} offen: ${SCHUTZ.filter((s) => !e[s.id]).map((s) => s.id).join(", ")}. Erst wenn alle beantwortet sind, kann das Ergebnis grün sein.`] : []),
         ...(treffer.length === 0 ? ["Das Kündigungsschutzgesetz kann trotzdem gelten (mehr als 10 Beschäftigte, mehr als 6 Monate im Betrieb)."] : []),
         ...(treffer.filter((t) => t.effektiv === "zustimmung").length > 1 ? ["Jeder Schutz gilt für sich, du brauchst jede Zustimmung einzeln."] : []),
         "Der Sonderkündigungsschutz gilt auch im Kleinbetrieb ohne Kündigungsschutzgesetz.",
@@ -208,20 +211,20 @@ const bem_pflicht: Werkzeug = {
   }, ["zeitraeume"]),
   ausfuehren(e, heute) {
     const st = toDay((e.stichtag as string | undefined) ?? heute);
-    if (Number.isNaN(st)) return fehler("Der Stichtag ist kein gültiges Datum.", heute);
+    if (Number.isNaN(st)) return fehler("Der Stichtag ist kein gültiges Datum.");
     const tage = (e.arbeitstage as string[] | undefined) ?? ["Mo", "Di", "Mi", "Do", "Fr"];
     const woche = TAGE.map((t) => tage.includes(t));
-    if (!woche.some(Boolean)) return fehler("Wähle mindestens einen Arbeitstag.", heute);
+    if (!woche.some(Boolean)) return fehler("Wähle mindestens einen Arbeitstag.");
     const perioden: { von: number; bis: number | null }[] = [];
     const spaeter: number[] = [];
     for (const [i, z] of (e.zeitraeume as { von: string; bis?: string }[]).entries()) {
       const von = toDay(z.von), bis = z.bis === undefined ? null : toDay(z.bis);
-      if (Number.isNaN(von) || (bis !== null && Number.isNaN(bis))) return fehler(`Zeitraum ${i + 1}: kein gültiges Datum.`, heute);
-      if (bis !== null && bis < von) return fehler(`Zeitraum ${i + 1}: Das Ende liegt vor dem Beginn.`, heute);
+      if (Number.isNaN(von) || (bis !== null && Number.isNaN(bis))) return fehler(`Zeitraum ${i + 1}: kein gültiges Datum.`);
+      if (bis !== null && bis < von) return fehler(`Zeitraum ${i + 1}: Das Ende liegt vor dem Beginn.`);
       if (von > st) spaeter.push(i + 1);
       else perioden.push({ von, bis });
     }
-    if (!perioden.length) return fehler("Trag mindestens einen Zeitraum ein, der vor dem Stichtag beginnt.", heute);
+    if (!perioden.length) return fehler("Trag mindestens einen Zeitraum ein, der vor dem Stichtag beginnt.");
     const r = berechneBem(perioden, st, woche);
     const proWoche = woche.filter(Boolean).length;
     const pflicht = r.ueberKalender || r.ueberArbeit;
@@ -271,7 +274,7 @@ const bem_pflicht: Werkzeug = {
         ]
         : [
           "Prüf die Krankmeldungen einmal im Monat. Wer die Grenze überschreitet, bekommt innerhalb von zwei Wochen eine Einladung.",
-          `Frist merken: Werkzeug frist_merken, Frist „Wiedervorlage BEM-Prüfung“ am ${fmtDay(wiedervorlage)}.`,
+          `Frist merken: Werkzeug frist_merken, Frist „Wiedervorlage BEM-Prüfung“ am ${fromDay(wiedervorlage)}.`,
         ],
     }, heute);
   },

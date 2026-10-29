@@ -1,5 +1,6 @@
 // Testfälle aus packages/kern/website/scripts/test-geld.mjs und test-tools-logik.mjs, hier durch die Werkzeuge gerufen.
 import { describe, expect, it } from "vitest";
+import { WERKZEUGE } from "../src/werkzeuge";
 import { rufe } from "./hilfe";
 
 describe("entgeltfortzahlung", () => {
@@ -40,8 +41,7 @@ describe("entgeltfortzahlung", () => {
     expect(a.quellen.map((q) => q.url)).toContain("https://www.bundesarbeitsgericht.de/entscheidung/5-azr-505-18/");
   });
   it("Zeitraum vor Arbeitsbeginn wird abgelehnt", () => {
-    const a = rufe("entgeltfortzahlung", { beginn: "2026-02-01", zeitraeume: [{ von: "2026-01-05", bis: "2026-01-10" }] });
-    expect(a.ergebnis.fehler).toMatch(/Arbeitsbeginn/);
+    expect(() => rufe("entgeltfortzahlung", { beginn: "2026-02-01", zeitraeume: [{ von: "2026-01-05", bis: "2026-01-10" }] })).toThrow(/Arbeitsbeginn/);
   });
 });
 
@@ -72,7 +72,7 @@ describe("urlaubsabgeltung", () => {
     expect(a.fallen!.join(" ")).toMatch(/zu viel gezahltes Urlaubsentgelt/i);
   });
   it("ohne Daten und ohne offene Tage gibt es einen Hinweis statt einer Zahl", () => {
-    expect(rufe("urlaubsabgeltung", { tage_pro_woche: 5, verdienst_13_wochen: 6500 }).ergebnis.fehler).toMatch(/Eintritt/);
+    expect(() => rufe("urlaubsabgeltung", { tage_pro_woche: 5, verdienst_13_wochen: 6500 })).toThrow(/Eintritt/);
   });
 });
 
@@ -100,7 +100,7 @@ describe("abfindung_faustformel", () => {
     expect(a.ergebnis.hoechstbetrag_gericht).toEqual({ monatsverdienste: 18, betrag: 72000 });
   });
   it("Jahresgehalt statt Monatsgehalt wird abgefangen", () => {
-    expect(rufe("abfindung_faustformel", { monatsgehalt_brutto: 120000, eintritt: "2020-01-01", austritt: "2025-12-31" }).ergebnis.fehler).toMatch(/Monatsgehalt/);
+    expect(() => rufe("abfindung_faustformel", { monatsgehalt_brutto: 120000, eintritt: "2020-01-01", austritt: "2025-12-31" })).toThrow(/Monatsgehalt/);
   });
 });
 
@@ -123,7 +123,7 @@ describe("ausgleichsabgabe", () => {
     expect(a.ergebnis).toMatchObject({ pflichtig: false, ausgleichsabgabe: 0 });
   });
   it("5 Monatswerte sind weder einer noch zwölf", () => {
-    expect(rufe("ausgleichsabgabe", { arbeitsplaetze: [20, 20, 20, 20, 20] }).ergebnis.fehler).toMatch(/12/);
+    expect(() => rufe("ausgleichsabgabe", { arbeitsplaetze: [20, 20, 20, 20, 20] })).toThrow(/12/);
   });
 });
 
@@ -145,9 +145,11 @@ describe("minijob", () => {
     expect(a.ergebnis.mindestlohn_eingehalten).toBe(false);
     expect(a.fallen!.join(" ")).toMatch(/unter dem Mindestlohn/);
   });
-  it("2027: Grenze 633 €, Jahresgrenze 7.596 €", () => {
-    const a = rufe("minijob", { jahr: "2027", stundenlohn: 14.6, stunden: 10, stunden_je: "monat" });
-    expect(a.ergebnis).toMatchObject({ verdienstgrenze_monat: 633, jahresgrenze: 7596 });
+  it("2027: Grenze 633 €, Jahresgrenze 7.596 €, Abgaben ohne Zahl bis der KV-Wert im Register steht", () => {
+    const a = rufe("minijob", { jahr: 2027, stundenlohn: 14.6, stunden: 10, stunden_je: "monat" });
+    expect(a.ergebnis).toMatchObject({ verdienstgrenze_monat: 633, jahresgrenze: 7596, kosten_arbeitgeber: null });
+    expect(a.fallen!.join(" ")).toMatch(/rechnet Lintelly HR noch nicht/);
+    expect(WERKZEUGE.find((w) => w.name === "minijob")!.eingabe.properties.gesetzlich_krankenversichert.description).not.toMatch(/13 %/);
   });
   it("Einmalzahlung über dem Jahresspielraum kippt den Minijob", () => {
     expect(rufe("minijob", { jahr: "2026", stundenlohn: 20, stunden: 30, stunden_je: "monat" }).ergebnis.geplant.spielraum_einmalzahlungen).toBe(36);

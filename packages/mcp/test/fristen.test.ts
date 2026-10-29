@@ -25,7 +25,7 @@ describe("probezeit", () => {
     expect(a).not.toHaveProperty("lintelly");
   });
   it("Azubi 5 Monate ist ein Fehler (§ 20 BBiG)", () => {
-    expect(rufe("probezeit", { beginn: "2026-10-01", dauer: 5, ausbildung: true }).ergebnis.fehler[0]).toMatch(/4 Monate/);
+    expect(() => rufe("probezeit", { beginn: "2026-10-01", dauer: 5, ausbildung: true })).toThrow(/4 Monate/);
   });
   it("Kleinbetrieb: KSchG gilt nicht, Wochenende am letzten Tag wird gemeldet", () => {
     const a = rufe("probezeit", { beginn: "2026-05-01", dauer: 6, beschaeftigte: 5 });
@@ -94,7 +94,7 @@ describe("elternzeit_fristen", () => {
     expect(a.ergebnis.urlaubskuerzung).toEqual([{ jahr: 2026, monate: 5, tage: 12.5 }]);
   });
   it("mehr als 3 Jahre ist ein Fehler", () => {
-    expect(ez({ ende: "2029-06-30" }).ergebnis.fehler[0]).toMatch(/höchstens 3 Jahre/);
+    expect(() => ez({ ende: "2029-06-30" })).toThrow(/höchstens 3 Jahre/);
   });
 });
 
@@ -122,7 +122,7 @@ describe("mutterschutz", () => {
     expect(rufe("mutterschutz", { fall: "fehlgeburt", fehlgeburt_am: "2026-05-10", schwangerschaftswoche: 22, ab_500_gramm: true }).ergebnis.totgeburt).toBe(true);
   });
   it("ohne Termin gibt es einen Fehler statt einer Rechnung", () => {
-    expect(rufe("mutterschutz", {}).ergebnis.fehler[0]).toMatch(/Entbindungstermin/);
+    expect(() => rufe("mutterschutz", {})).toThrow(/Entbindungstermin/);
   });
 });
 

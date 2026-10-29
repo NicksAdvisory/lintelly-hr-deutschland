@@ -8,7 +8,7 @@ import { eindeutig, findeFallen } from "../../../kern/website/components/tools/s
 import { addDays, addMonths, formatDE } from "../../../kern/website/lib/fristen";
 import { WERTE } from "@/lib/regeln/werte";
 import { antwort, normQuelle, registerQuelle } from "../antwort";
-import { datum, janein, liste, schema, text, zahl } from "../eingabe";
+import { datum, ganzzahl, janein, liste, schema, text } from "../eingabe";
 import type { Werkzeug } from "../werkzeug";
 
 /* ---------- Arbeitszeugnis (arbeitszeugnis-generator.tsx, lib/ki/batch-1.ts) ---------- */
@@ -71,7 +71,7 @@ function schlussSatz(zwischen: boolean, modus: string, note: number, grund: stri
 }
 
 type Teil = { teil: string; pflicht: boolean; text?: string; vorgabe?: string; note?: number; stufe?: string };
-const notenFeld = (bereich: string) => zahl(`Grade for ${bereich}, 1 (sehr gut) to 5 (mangelhaft), default 2`, 1, 5);
+const notenFeld = (bereich: string) => ganzzahl(`Grade for ${bereich}, 1 (sehr gut) to 5 (mangelhaft), default 2`, 1, 5);
 const de = (n: number) => n.toLocaleString("de-DE", { maximumFractionDigits: 2 });
 
 const arbeitszeugnis: Werkzeug = {
@@ -489,7 +489,7 @@ const nachweis_pflichtangaben: Werkzeug = {
     empfangsbestaetigung: janein("With textform: the employee is asked to confirm receipt"),
     angaben: liste(
       "What the contract already contains, per item 1 to 15: drin (included), fehlt (missing), entfaellt (not applicable, only for items that apply only if agreed). Items without an answer count as open",
-      schema({ nr: zahl("Item number 1 to 15", 1, 15), stand: text("drin, fehlt or entfaellt", { enum: STAND }) }, ["nr", "stand"]),
+      schema({ nr: ganzzahl("Item number 1 to 15", 1, 15), stand: text("drin, fehlt or entfaellt", { enum: STAND }) }, ["nr", "stand"]),
       15,
     ),
   }),

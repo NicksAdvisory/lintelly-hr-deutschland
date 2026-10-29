@@ -1,7 +1,7 @@
 /**
  * Geld aus den Rechnern von lintelly.com/tools: Entgeltfortzahlung, Urlaubsabgeltung, Abfindung, Ausgleichsabgabe, Minijob.
  * Gerechnet wird nur mit der Logik der Website (packages/kern/website/components/tools/*-logik.ts), Texte und Warnungen
- * folgen den Seiten. Fehlerhafte Angaben kommen als ergebnis.fehler zurück, nicht als Zahl.
+ * folgen den Seiten. Fehlerhafte Angaben kommen als Fehler zurück (isError), nicht als Zahl.
  */
 import { berechneEfz, krankengeldText, ueber78Wochen, wiederVollText, type FallErgebnis } from "../../../kern/website/components/tools/entgeltfortzahlung-logik";
 import { berechneBem } from "../../../kern/website/components/tools/bem-logik";
@@ -11,16 +11,29 @@ import { berechne as ausgleich, besetztText, mehrAlsPlaetze, MONATE, SAETZE } fr
 import { abgabenArbeitgeber, berechneMinijob, MIDIJOB_OBERGRENZE, STAND, WOCHEN_PRO_MONAT, type Basis, type Jahr } from "../../../kern/website/components/tools/minijob-logik";
 import { addDays, diffDays, fmt, fmtDay, parseYmd, toDay, toYmd } from "../../../kern/website/components/tools/datum";
 import { eur, plural, zahl as dz, zahlFest } from "../../../kern/website/components/tools/format";
-import { antwort, normQuelle, registerQuelle } from "../antwort";
-import { datum, janein, liste, schema, text, zahl } from "../eingabe";
+import { formatDE } from "@/lib/regeln/datum";
+import { AUSSTEHEND } from "@/lib/regeln/werte";
+import { antwort, fehler, normQuelle, registerQuelle } from "../antwort";
+import { datum, ganzzahl, jahr as jahrFeld, janein, liste, schema, text, zahl } from "../eingabe";
 import type { Werkzeug } from "../werkzeug";
 
-const fehler = (meldung: string, heute: string) => antwort({ ergebnis: { fehler: meldung } }, heute);
 const ymd = (d: Date | null) => (d ? toYmd(d) : null);
 const cent = (x: number) => Math.round(x * 100) / 100;
 /** Jahr aus der Eingabe, sonst das laufende, sonst das letzte bekannte. */
 const jahrAus = (wahl: unknown, jahre: string[], heute: string) =>
-  Number((wahl as string | undefined) ?? (jahre.includes(heute.slice(0, 4)) ? heute.slice(0, 4) : jahre.at(-1)));
+  (wahl as number | undefined) ?? Number(jahre.includes(heute.slice(0, 4)) ? heute.slice(0, 4) : jahre.at(-1));
+const jahreVon = (jahre: string[]) => [Number(jahre[0]), Number(jahre.at(-1))] as const;
+
+/**
+ * Die Minijob-Abgaben rechnet der Rechner von lintelly.com mit den Sätzen 2026 (KV-Pauschale 13 %). Ab 2027 ist die KV-Pauschale kein
+ * fester Satz mehr (§ 249b SGB V). Solange der Wert im Register aussteht (AUSSTEHEND), gibt es keine Zahl, nur diesen Hinweis
+ * (Review 29.10.2026). Steht der Wert im Register, fällt der Eintrag in AUSSTEHEND weg: dann hier und in minijob-logik.ts nachziehen.
+ */
+export function minijobAbgabenOffen(tag: string): string | null {
+  const a = AUSSTEHEND.minijobAgPauschale;
+  return tag < a.gueltigAb ? null
+    : `Die Arbeitgeberabgaben im Minijob ab ${formatDE(a.gueltigAb)} rechnet Lintelly HR noch nicht: Die Pauschale zur Krankenversicherung ist dann kein fester Satz von 13 % mehr, sondern der allgemeine Beitragssatz plus der durchschnittliche Zusatzbeitrag (§ 249b SGB V in der Fassung ab ${formatDE(a.gueltigAb)}). Der Wert steht noch nicht im Register (erwartet: ${a.erwartet}). Rentenversicherung und Pauschsteuer ändert das Gesetz nicht.`;
+}
 
 /* ---------- Entgeltfortzahlung (§ 3 EFZG) ---------- */
 
@@ -58,7 +71,7 @@ const entgeltfortzahlung: Werkzeug = {
       schema({
         von: datum("First day of incapacity to work"),
         bis: datum("Last day of incapacity to work"),
-        gleiche_erkrankung_wie: zahl("Number of an earlier period (1 = first) with the same illness (Fortsetzungserkrankung). Leave out for a new illness", 1, 11),
+        gleiche_erkrankung_wie: ganzzahl("Number of an earlier period (1 = first) with the same illness (Fortsetzungserkrankung). Leave out for a new illness", 1, 11),
         ursache_unsicher: janein("True if it is not certain that it is the same illness; both variants are then calculated"),
         erster_tag_gearbeitet: janein("True if the person still worked on the first day; that day does not count"),
       }, ["von", "bis"]),
@@ -68,16 +81,16 @@ const entgeltfortzahlung: Werkzeug = {
   ausfuehren(e, heute) {
     const beginn = parseYmd(e.beginn as string);
     const zr = e.zeitraeume as Zeitraum[];
-    if (!beginn) return fehler("Der Beginn ist kein gültiges Datum.", heute);
-    if (!zr.length) return fehler("Trag mindestens einen Krankheitszeitraum ein.", heute);
+    if (!beginn) return fehler("Der Beginn ist kein gültiges Datum.");
+    if (!zr.length) return fehler("Trag mindestens einen Krankheitszeitraum ein.");
     const perioden: { nr: number; von: Date; bis: Date; angefangen: boolean }[] = [];
     for (const [i, z] of zr.entries()) {
       const nr = i + 1, von = parseYmd(z.von), bis = parseYmd(z.bis), ref = z.gleiche_erkrankung_wie;
-      if (!von || !bis) return fehler(`Zeitraum ${nr}: kein gültiges Datum.`, heute);
-      if (bis < von) return fehler(`Zeitraum ${nr}: Der letzte Tag liegt vor dem ersten Tag.`, heute);
-      if (von < beginn) return fehler(`Zeitraum ${nr} liegt vor dem Arbeitsbeginn.`, heute);
-      if (i && von < perioden[i - 1].von) return fehler(`Zeitraum ${nr}: Bitte die Zeiträume in zeitlicher Reihenfolge angeben.`, heute);
-      if (ref !== undefined && (!Number.isInteger(ref) || ref >= nr)) return fehler(`Zeitraum ${nr}: gleiche_erkrankung_wie muss die Nummer eines früheren Zeitraums sein.`, heute);
+      if (!von || !bis) return fehler(`Zeitraum ${nr}: kein gültiges Datum.`);
+      if (bis < von) return fehler(`Zeitraum ${nr}: Der letzte Tag liegt vor dem ersten Tag.`);
+      if (von < beginn) return fehler(`Zeitraum ${nr} liegt vor dem Arbeitsbeginn.`);
+      if (i && von < perioden[i - 1].von) return fehler(`Zeitraum ${nr}: Bitte die Zeiträume in zeitlicher Reihenfolge angeben.`);
+      if (ref !== undefined && ref >= nr) return fehler(`Zeitraum ${nr}: gleiche_erkrankung_wie muss die Nummer eines früheren Zeitraums sein.`);
       perioden.push({ nr, von, bis, angefangen: !!z.erster_tag_gearbeitet });
     }
     // Wie auf der Website: dieselbe Erkrankung übernimmt die Gruppe des genannten Zeitraums, unsichere nur in Variante A
@@ -135,7 +148,7 @@ const entgeltfortzahlung: Werkzeug = {
         bem.ueberKalender
           ? `BEM anbieten: In den 12 Monaten bis ${fmtDay(stichtag)} kommen ${bem.kalendertage} Kalendertage Arbeitsunfähigkeit zusammen, mehr als 6 Wochen (§ 167 Abs. 2 SGB IX). Werkzeug bem_pflicht zeigt Zählung und Schritte.`
           : "Kommen in 12 Monaten mehr als 6 Wochen Arbeitsunfähigkeit zusammen, egal aus welcher Ursache, bietest du ein BEM an (§ 167 Abs. 2 SGB IX). Werkzeug bem_pflicht prüft das.",
-        ...(letzter.efzBis ? [`Frist merken: Werkzeug frist_merken, Frist „Ende der Entgeltfortzahlung“ am ${fmt(letzter.efzBis)}.`] : []),
+        ...(letzter.efzBis ? [`Frist merken: Werkzeug frist_merken, Frist „Ende der Entgeltfortzahlung“ am ${toYmd(letzter.efzBis)}.`] : []),
       ],
     }, heute);
   },
@@ -166,7 +179,7 @@ const urlaubsabgeltung: Werkzeug = {
     const tw = e.tage_pro_woche as number;
     const gehalt = e.monatsgehalt_brutto as number | undefined, variabel = (e.variabel_13_wochen as number | undefined) ?? 0;
     const v13 = (e.verdienst_13_wochen as number | undefined) ?? (gehalt !== undefined ? 3 * gehalt + variabel : undefined);
-    if (v13 === undefined) return fehler("Es fehlt der Verdienst: monatsgehalt_brutto oder verdienst_13_wochen.", heute);
+    if (v13 === undefined) return fehler("Es fehlt der Verdienst: monatsgehalt_brutto oder verdienst_13_wochen.");
     let offen = e.offene_tage as number | undefined;
     let r: AnspruchErgebnis | null = null;
     let austritt: Date | null = null;
@@ -174,8 +187,8 @@ const urlaubsabgeltung: Werkzeug = {
     if (offen === undefined) {
       const ein = parseYmd(e.eintritt as string | undefined);
       austritt = parseYmd(e.austritt as string | undefined);
-      if (!ein || !austritt || e.jahresurlaub === undefined) return fehler("Für die Berechnung fehlen Eintritt, Ende und Jahresurlaub. Oder gib die offenen Tage direkt an.", heute);
-      if (austritt < ein) return fehler("Das Ende liegt vor dem Eintritt.", heute);
+      if (!ein || !austritt || e.jahresurlaub === undefined) return fehler("Für die Berechnung fehlen Eintritt, Ende und Jahresurlaub. Oder gib die offenen Tage direkt an.");
+      if (austritt < ein) return fehler("Das Ende liegt vor dem Eintritt.");
       r = anspruchImAustrittsjahr({ eintritt: ein, austritt, jahresurlaub: e.jahresurlaub as number, tageWoche: tw, mehrZwoelfteln: !!e.mehrurlaub_gezwoelftelt, schwerbehindert: !!e.schwerbehindert });
       vorjahrAuto = e.rest_vorjahr === undefined && r.vorjahrTeil > 0;
       uebertrag = (e.rest_vorjahr as number | undefined) ?? r.vorjahrTeil;
@@ -267,7 +280,7 @@ const abfindung_faustformel: Werkzeug = {
     austritt: datum("Last day of employment"),
     zugang_kuendigung: datum("Day the notice of termination was received; the 6-month waiting period of the KSchG counts to this day"),
     faktor: zahl("Monthly salaries per year of service, default 0.5 (statutory value), commonly up to 1.0", 0.25, 2),
-    alter: zahl("Age at leaving in years, only for the legal cap", 14, 80),
+    alter: ganzzahl("Age at leaving in whole years, only for the legal cap", 14, 80),
     kleinbetrieb: janein("True for a small business with regularly 10 or fewer full-time employees (part-time counted pro rata)"),
   }, ["monatsgehalt_brutto", "eintritt", "austritt"]),
   ausfuehren(e, heute) {
@@ -276,7 +289,7 @@ const abfindung_faustformel: Werkzeug = {
       gehalt: alsText(e.monatsgehalt_brutto), sonder: alsText(e.sonderzahlungen_jahr), eintritt: e.eintritt as string, austritt: e.austritt as string,
       zugang: (e.zugang_kuendigung as string | undefined) ?? "", faktor, alter: e.alter === undefined ? "" : String(e.alter), klein: !!e.kleinbetrieb,
     });
-    if (!roh || roh.betrag === undefined) return fehler(Object.values(roh?.errors ?? {}).join(" "), heute);
+    if (!roh || roh.betrag === undefined) return fehler(Object.values(roh?.errors ?? {}).join(" "));
     const r = roh as Extract<typeof roh, { betrag: number }>;
     const sonder = (e.sonderzahlungen_jahr as number | undefined) ?? 0;
     const rest = r.dauer.m || r.dauer.d ? (r.rest ? " Der Rest über 6 Monate wird aufgerundet." : " Ein Rest bis 6 Monate fällt weg.") : "";
@@ -319,17 +332,16 @@ const ausgleichsabgabe: Werkzeug = {
   beschreibung:
     "Compensatory levy for unfilled jobs for severely disabled people under German law (Ausgleichsabgabe, §§ 154, 160 SGB IX), years 2024 to 2026. Takes the jobs and the severely disabled employees per month (or one value for all months) and returns required places, employment rate, rate per place and month, the levy and the 31 March deadline. Only employers with 20 or more jobs on annual average are affected. Germany only.",
   eingabe: schema({
-    jahr: text("Calendar year of employment, default the current year", { enum: Object.keys(SAETZE) }),
-    arbeitsplaetze: liste("Jobs (Arbeitsplätze) of 18 or more hours per week without apprentices and fixed terms up to 8 weeks: one value for every month or 12 values January to December", zahl("Number of jobs", 0, 100000), 12),
-    schwerbehinderte: liste("Severely disabled or equivalent employees as counted by the employment agency (angerechnet): one value or 12 monthly values, default 0", zahl("Number of people", 0, 100000), 12),
+    jahr: jahrFeld("Calendar year of employment, default the current year", ...jahreVon(Object.keys(SAETZE))),
+    arbeitsplaetze: liste("Jobs (Arbeitsplätze) of 18 or more hours per week without apprentices and fixed terms up to 8 weeks: one value for every month or 12 values January to December", ganzzahl("Number of jobs", 0, 100000), 12),
+    schwerbehinderte: liste("Severely disabled or equivalent employees as counted by the employment agency (angerechnet): one value or 12 monthly values, default 0", ganzzahl("Number of people", 0, 100000), 12),
   }, ["arbeitsplaetze"]),
   ausfuehren(e, heute) {
     const jahr = jahrAus(e.jahr, Object.keys(SAETZE), heute);
     const monate = (x: number[] | undefined) => (x === undefined ? Array(12).fill(0) : x.length === 1 ? Array(12).fill(x[0]) : x);
     const ap: number[] = monate(e.arbeitsplaetze as number[]), b: number[] = monate(e.schwerbehinderte as number[] | undefined);
-    if (ap.length !== 12 || b.length !== 12) return fehler("Gib einen Wert für alle Monate an oder 12 Monatswerte von Januar bis Dezember.", heute);
-    if (![...ap, ...b].every(Number.isInteger)) return fehler("Nur ganze Zahlen ab 0.", heute);
-    if (ap.every((x) => x === 0)) return fehler("Trag für mindestens einen Monat Arbeitsplätze ein.", heute);
+    if (ap.length !== 12 || b.length !== 12) return fehler("Gib einen Wert für alle Monate an oder 12 Monatswerte von Januar bis Dezember.");
+    if (ap.every((x) => x === 0)) return fehler("Trag für mindestens einen Monat Arbeitsplätze ein.");
     const r = ausgleich(ap, b, jahr);
     const ersparnis = r.abgabe - ausgleich(ap, b.map((x) => x + 1), jahr).abgabe;
     const zuViele = mehrAlsPlaetze(ap, b);
@@ -379,7 +391,7 @@ const ausgleichsabgabe: Werkzeug = {
         ? [
           `Bis ${faelligDe}: Anzeige an die Agentur für Arbeit (§ 163 Abs. 2 SGB IX), meist über IW-Elan, und Zahlung an das Integrationsamt (§ 160 Abs. 4 SGB IX).`,
           "Führ das Verzeichnis der schwerbehinderten Beschäftigten laufend.",
-          `Frist merken: Werkzeug frist_merken, Frist „Anzeige und Zahlung der Ausgleichsabgabe“ am ${faelligDe}.`,
+          `Frist merken: Werkzeug frist_merken, Frist „Anzeige und Zahlung der Ausgleichsabgabe“ am ${faellig}.`,
         ]
         : [],
     }, heute);
@@ -392,14 +404,14 @@ const minijob: Werkzeug = {
   name: "minijob",
   titel: "Minijob: Stunden, Grenze und Kosten",
   beschreibung:
-    "Mini-job check under German law (Minijob, geringfügige Beschäftigung, § 8 SGB IV) for 2026 and 2027: maximum hours under the monthly earnings limit, minimum wage check (Mindestlohn), annual limit including one-off payments, and the employer's flat-rate contributions and levies (Pauschalabgaben). Use it before hiring a mini-jobber or changing hours or pay. Germany only.",
+    `Mini-job check under German law (Minijob, geringfügige Beschäftigung, § 8 SGB IV) for ${Object.keys(STAND).join(" and ")}: maximum hours under the monthly earnings limit, minimum wage check (Mindestlohn), annual limit including one-off payments, and the employer's flat-rate contributions and levies (Pauschalabgaben) for the years whose rates are published. Use it before hiring a mini-jobber or changing hours or pay. Germany only.`,
   eingabe: schema({
-    jahr: text("Year, default the current year", { enum: Object.keys(STAND) }),
+    jahr: jahrFeld("Year, default the current year", ...jahreVon(Object.keys(STAND))),
     stundenlohn: zahl("Gross hourly wage in euros", 0.01, 200),
     stunden: zahl("Planned working hours, leave out to get only the maximum hours", 0, 300),
     stunden_je: text("Whether the hours are per week or per month, default week", { enum: ["woche", "monat"] }),
     einmalzahlungen_jahr: zahl("Promised one-off payments in the year in euros, e.g. Christmas bonus", 0),
-    gesetzlich_krankenversichert: janein("True (default) if the person has statutory health insurance; then the employer pays the 13 % health flat rate"),
+    gesetzlich_krankenversichert: janein("True (default) if the person has statutory health insurance; then the employer pays the health flat rate (Pauschale zur Krankenversicherung)"),
     pauschsteuer: janein("True (default) for the usual 2 % flat-rate tax"),
     unter_18_ohne_berufsabschluss: janein("True if the person is under 18 without vocational qualification; then the minimum wage does not apply (§ 22 Abs. 2 MiLoG)"),
   }, ["stundenlohn"]),
@@ -407,11 +419,11 @@ const minijob: Werkzeug = {
     const jahr = jahrAus(e.jahr, Object.keys(STAND), heute) as Jahr;
     const lohn = e.stundenlohn as number, stunden = (e.stunden as number | undefined) ?? null, basis = (e.stunden_je as Basis | undefined) ?? "woche";
     const einmal = (e.einmalzahlungen_jahr as number | undefined) ?? 0, minderjaehrig = !!e.unter_18_ohne_berufsabschluss;
-    if (stunden !== null && stunden > (basis === "monat" ? 300 : 70)) return fehler("Das sind mehr Stunden, als ein Minijob haben kann.", heute);
+    if (stunden !== null && stunden > (basis === "monat" ? 300 : 70)) return fehler("Das sind mehr Stunden, als ein Minijob haben kann.");
     const r = berechneMinijob(lohn, stunden, basis, jahr, einmal);
     const kostenBasis = r.monatsEntgelt ?? r.grenze;
-    // Abgabensätze gibt es nur für 2026 (wie auf der Seite)
-    const kosten = jahr === 2026 && r.imMinijob !== false
+    const offen = minijobAbgabenOffen(`${jahr}-01-01`);
+    const kosten = !offen && r.imMinijob !== false
       ? abgabenArbeitgeber(kostenBasis, { gesetzlichVersichert: e.gesetzlich_krankenversichert !== false, pauschsteuer: e.pauschsteuer !== false })
       : null;
     const n = STAND[(jahr + 1) as Jahr] as (typeof STAND)[Jahr] | undefined;
@@ -451,7 +463,7 @@ const minijob: Werkzeug = {
       quellen: [
         registerQuelle("minijobGrenze", heute), registerQuelle("mindestlohn", heute),
         ...(minderjaehrig ? [normQuelle("§ 22 Abs. 2 MiLoG")] : []),
-        ...(kosten ? [registerQuelle("minijobAgPauschale", heute)] : []),
+        registerQuelle("minijobAgPauschale", heute),
         registerQuelle("milogAufzeichnung", heute),
       ],
       fallen: [
@@ -463,9 +475,7 @@ const minijob: Werkzeug = {
           : r.grund === "jahr"
           ? [`Die Einmalzahlung kippt den Minijob: Im Monat bleibst du mit ${eur(r.monatsEntgelt!)} unter ${eur(r.grenze)}. Mit ${eur(einmal)} Einmalzahlung kommt das Jahr aber auf ${eur(r.jahresEntgelt!)}, mehr als die Jahresgrenze von ${eur(r.jahresGrenze)}. Damit ist die Stelle sozialversicherungspflichtig, im Übergangsbereich (Midijob, Stand 2026). Den Minijob hältst du mit höchstens ${eur(r.spielraum!)} Einmalzahlung im Jahr. Sag deinem Lohnbüro vor dem Start Bescheid.`]
           : []),
-        ...(jahr !== 2026
-          ? ["Abgaben 2027 noch offen: Ab 01.01.2027 steigt die Pauschale zur Krankenversicherung von 13 % auf 14,6 % plus den durchschnittlichen Zusatzbeitrag (GKV-Beitragssatzstabilisierungsgesetz). Der Zusatzbeitrag für 2027 wird erst im Herbst festgelegt. Mit jahr 2026 siehst du die Kosten mit den heutigen Sätzen."]
-          : []),
+        ...(offen ? [offen] : []),
         ...(n
           ? [`Ab 01.01.${jahr + 1} gelten ${eur(n.mindestlohn)} Mindestlohn und ${eur(n.grenze)} Grenze.`
             + (minderjaehrig ? " Für Minderjährige ohne Berufsabschluss gilt der Mindestlohn weiter nicht, die Grenze steigt trotzdem." : lohn < n.mindestlohn ? ` Der Stundenlohn von ${eur(lohn)} muss dann auf mindestens ${eur(n.mindestlohn)} steigen.` : "")

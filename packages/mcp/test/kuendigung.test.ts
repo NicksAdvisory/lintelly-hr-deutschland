@@ -6,7 +6,8 @@ describe("kuendigungsfrist_rechnen", () => {
     const a = rufe("kuendigungsfrist_rechnen", { eintritt: "2019-03-01", zugang: "2026-11-15" });
     expect(a.ergebnis).toMatchObject({ ende: "2027-01-31", spaetester_zugang: "2026-11-30", regel: "2 Monate zum Monatsende", norm: expect.stringMatching(/^§\s622\sAbs\.\s2\sBGB$/) });
     expect(a.fallen.join(" ")).toMatch(/Sonntag/);
-    expect(a.quellen[0]).toMatchObject({ norm: "§ 622 BGB", url: "https://www.gesetze-im-internet.de/bgb/__622.html" });
+    // Quelle der angewandten Regel aus dem Register, mit Prüfdatum und Status (Review 29.10.2026)
+    expect(a.quellen[0]).toMatchObject({ norm: "§ 622 Abs. 2 BGB", url: "https://www.gesetze-im-internet.de/bgb/__622.html", status: "bestätigt" });
     expect(a).not.toHaveProperty("lintelly");
   });
   it("Website-Test: Grundfrist, Zugang 19.10. endet 30.11.", () => {

@@ -44,6 +44,28 @@ describe("ablauf erste_einstellung (Szenario 1)", () => {
     expect(a.quellen.map((q) => q.norm)).toEqual(expect.arrayContaining(["§ 18i Abs. 1 SGB IV", "§ 192 Abs. 1 SGB VII", "§ 41a Abs. 1 EStG"]));
     expect(a).not.toHaveProperty("lintelly");
   });
+  it("erste Einstellung ohne Team: kein Buddy, kein Team, kein Betriebsrat, Rollen bei der Geschäftsführung", () => {
+    const a = rufe("ablauf", { art: "erste_einstellung", datum: "2026-12-01", beschaeftigte: 0 });
+    const text = JSON.stringify(schritte(a));
+    expect(text).not.toMatch(/Buddy|Team|Betriebsrat/);
+    expect(new Set(schritte(a).map((s) => s.wer))).toEqual(new Set(["Geschäftsführung", "Lohnbüro", "Neue Person"]));
+    expect(JSON.stringify(schritte(rufe("ablauf", { art: "erste_einstellung", datum: "2026-12-01", beschaeftigte: 3 })))).toMatch(/Buddy/);
+  });
+  it("Mindestlohn-Check im Dezember nennt den neuen Wert ab 01.01.2027 (Review 29.10.2026)", () => {
+    const a = rufe("ablauf", { art: "erste_einstellung", datum: "2026-12-01" });
+    expect(finde(a, "Mindestlohn-Check")?.hinweis).toMatch(/Ab 01\.01\.2027 gilt 14,60 €/);
+    expect(finde(rufe("ablauf", { art: "erste_einstellung", datum: "2026-03-01" }), "Mindestlohn-Check")?.hinweis).toBeUndefined();
+  });
+  it("Schritte vor heute sind überfällig und stehen in den Fallen, Quellen ohne Doppel", () => {
+    const a = rufe("ablauf", { art: "erste_einstellung", datum: "2026-12-01" }, "2026-10-29");
+    const alle = schritte(a) as (S & { ueberfaellig?: true })[];
+    expect(alle.filter((s) => s.ueberfaellig).map((s) => s.bis)).toEqual(["2026-10-27"]);
+    expect(alle.filter((s) => !s.ueberfaellig && s.bis && s.bis < "2026-10-29")).toEqual([]);
+    expect(a.fallen[0]).toMatch(/1 Schritt liegt mit bis vor heute/);
+    const normen = a.quellen.map((q) => q.norm);
+    expect(normen).not.toContain("§ 1 AAG");
+    expect(normen.filter((n) => n.startsWith("§ 1 MiLoV5"))).toHaveLength(1);
+  });
 });
 
 describe("ablauf austritt", () => {
@@ -143,7 +165,7 @@ describe("ablauf allgemein", () => {
     expect(() => rufe("ablauf", { art: "eintritt", datum: "2026-12-01", name: "Anna" })).toThrow(/Unbekanntes Feld/);
   });
   it("fehlende Angabe wird genannt statt geraten", () => {
-    expect(rufe("ablauf", { art: "krankheit" }).ergebnis.fehlt).toContain("datum");
+    expect(() => rufe("ablauf", { art: "krankheit" })).toThrow(/fehlt: datum\. datum bedeutet hier: erster Krankheitstag/);
   });
   it("kein Gedankenstrich in allen Arten", () => {
     for (const art of ARTEN) {
@@ -182,5 +204,10 @@ describe("workflow_vorlage", () => {
     expect(JSON.stringify(a)).not.toMatch(/ersparnis|Std/);
     expect(a).not.toHaveProperty("lintelly");
     expect(JSON.stringify(a)).not.toMatch(STRICH);
+  });
+  it("keine Werbung für die Werkbank, keine Erinnerung in Mein Lintelly", () => {
+    const a = rufe("workflow_vorlage", { kennung: "lohn-stichtag" });
+    expect(JSON.stringify(a.ergebnis)).not.toMatch(/Lintelly/);
+    expect(WERKZEUGE.find((w) => w.name === "workflow_vorlage")!.beschreibung).not.toMatch(/Lintelly/);
   });
 });

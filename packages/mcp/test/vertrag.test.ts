@@ -46,9 +46,7 @@ describe("vertragsbaustein", () => {
     }
   });
   it("unbekanntes Feld in den Angaben wird mit der Liste der Felder abgelehnt", () => {
-    const a = rufe("vertragsbaustein", { kennung: "B3", angaben: [{ feld: "name", wert: "Anna" }] });
-    expect(a.ergebnis.fehler).toMatch(/name/);
-    expect(a.ergebnis.text).toBeUndefined();
+    expect(() => rufe("vertragsbaustein", { kennung: "B3", angaben: [{ feld: "name", wert: "Anna" }] })).toThrow(/Unbekannte Angabe name\. Möglich: umfang/);
   });
 });
 

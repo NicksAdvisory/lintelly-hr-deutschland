@@ -12,8 +12,8 @@ import { SOFORTMELDUNG_BEREICHE } from "@/lib/sofortmeldung";
 import type { AustrittGrund, Beschaeftigung, Person, Plan } from "@/lib/types";
 import { kette } from "@/lib/workflows/anzeige";
 import { WORKFLOWS } from "@/lib/workflows/vorlagen";
-import { antwort, normQuelle, registerQuelle, type Quelle } from "../antwort";
-import { datum, janein, schema, text, zahl, type Eingabe } from "../eingabe";
+import { antwort, fehler, normQuelle, registerQuelle, type Quelle } from "../antwort";
+import { datum, ganzzahl, janein, schema, text, zahl } from "../eingabe";
 import { LAENDER, type Werkzeug } from "../werkzeug";
 
 /* ---------- Arten, Bedeutung des Datums, Pflichtangaben ---------- */
@@ -35,7 +35,7 @@ const ART_IDS = Object.keys(ARTEN) as Art[];
 
 /* ---------- Schritte ---------- */
 
-type Schritt = { was: string; bis: string | null; wer: string; pflicht?: string; hinweis?: string };
+type Schritt = { was: string; bis: string | null; wer: string; pflicht?: string; hinweis?: string; ueberfaellig?: true };
 /** register: Kennungen im Rechtswerte-Register. ab: Sortiertag, wenn bis fehlt oder der Schritt früher beginnt. */
 type Intern = Schritt & { register?: string[]; ab?: string };
 
@@ -69,14 +69,25 @@ const NEUTRAL: Record<string, { text?: string; hinweis?: string | null; ersetze?
   abrechnung: { text: "Schlussabrechnung mit Urlaubsabgeltung an das Lohnbüro (Tage und Rechenweg: Werkzeug urlaubsabgeltung)" },
 };
 
-function ausPlan(p: Plan, bereich?: string): Intern[] {
-  return p.aufgaben.map((a) => {
-    const n = NEUTRAL[a.id] ?? {};
+/**
+ * Erste Einstellung ohne Team (Review 29.10.2026): Buddy und Team gibt es noch nicht, auch keinen Betriebsrat. null heißt: Schritt entfällt.
+ * Was Führungskraft, IT oder Personal tun würden, macht die Geschäftsführung.
+ */
+const OHNE_TEAM: Record<string, { text?: string; ersetze?: [string, string][] } | null> = {
+  buddy: null, begruessung: null, "buddy-60": null, "team-info": null,
+  willkommen: { text: "Infos zum ersten Tag schicken: Ablauf und Anfahrt" },
+  fragebogen: { ersetze: [[" Mit Betriebsrat: Zustimmung nach § 94 BetrVG.", ""]] },
+};
+
+function ausPlan(p: Plan, bereich?: string, ohneTeam = false): Intern[] {
+  return p.aufgaben.filter((a) => !(ohneTeam && OHNE_TEAM[a.id] === null)).map((a) => {
+    const t = ohneTeam ? OHNE_TEAM[a.id] : undefined;
+    const n = { ...NEUTRAL[a.id], ...t, ersetze: [...(NEUTRAL[a.id]?.ersetze ?? []), ...(t?.ersetze ?? [])] };
     const tausche = (s: string | undefined) => (s === undefined ? undefined : (n.ersetze ?? []).reduce((t, [x, y]) => t.replace(x, y), s));
     const hinweis = n.hinweis === null ? undefined : tausche(n.hinweis ?? a.hinweis);
     let pflicht = a.pflicht;
     if (a.id === "sofortmeldung" && bereich) pflicht = pflicht?.replace("(Einrichtung, Firmenangaben)", `(${bereich})`);
-    return { was: n.text ?? tausche(a.text)!, bis: a.faellig, wer: WER[a.wer], ...(pflicht ? { pflicht } : {}), ...(hinweis ? { hinweis } : {}) };
+    return { was: n.text ?? tausche(a.text)!, bis: a.faellig, wer: ohneTeam && a.wer !== "person" ? GF : WER[a.wer], ...(pflicht ? { pflicht } : {}), ...(hinweis ? { hinweis } : {}) };
   });
 }
 
@@ -107,10 +118,10 @@ const austrittPlan = (e: E, heute: string, stichtag: string, grund: AustrittGrun
 type Ergebnis = { daten?: Record<string, unknown>; schritte: Intern[]; fallen?: string[]; weiter: string[] };
 const merken = "Fristen merken: Werkzeug frist_merken";
 
-function eintritt(e: E, heute: string, d: string): Ergebnis {
+function eintritt(e: E, heute: string, d: string, ohneTeam = false): Ergebnis {
   const pm = e.probezeit_monate || undefined;
   const plan = erzeugePlan({ id: "ablauf", art: "eintritt", person: personAus(e, d), stichtag: d, erstellt: heute, probezeitMonate: pm, sofortmeldung: !!bereichText(e), land: e.bundesland });
-  const schritte = ausPlan(plan, bereichText(e));
+  const schritte = ausPlan(plan, bereichText(e), ohneTeam);
   const ende = pm ? probezeitEnde(d, Math.min(pm, WERTE.probezeitHoechstMonate.wert)) : null;
   if (ende) schritte.push({ was: "Probezeit endet: Eine Kündigung mit 2 Wochen Frist muss bis zu diesem Tag zugegangen sein", bis: ende, wer: GF, pflicht: WERTE.probezeitKuendigungTage.quelle, register: ["probezeitKuendigungTage"] });
   return {
@@ -125,9 +136,12 @@ function eintritt(e: E, heute: string, d: string): Ergebnis {
 }
 
 function ersteEinstellung(e: E, heute: string, d: string): Ergebnis {
-  const basis = eintritt(e, heute, d);
+  const ohneTeam = !e.beschaeftigte;
+  const basis = eintritt(e, heute, d, ohneTeam);
   const ml = REGISTER.find((x) => x.id === "mindestlohn")!;
   const lohn = wertAm(ml, d)?.wert;
+  // Ändert sich der Mindestlohn in den 3 Monaten nach dem Start, gehört der neue Wert in den Check (Review 29.10.2026).
+  const neu = ml.werte.find((w) => !w.ausstehend && !!w.gueltigAb && w.gueltigAb > d && w.gueltigAb <= addMonths(d, 3));
   const erst: Intern[] = [
     { was: "Betriebsnummer beim Betriebsnummern-Service der Bundesagentur für Arbeit elektronisch beantragen", bis: d, wer: GF, pflicht: "§ 18i Abs. 1 SGB IV", hinweis: "Ohne Betriebsnummer keine Meldung zur Sozialversicherung. Sie gilt je Beschäftigungsbetrieb." },
     { was: "Firma bei der zuständigen Berufsgenossenschaft (gesetzliche Unfallversicherung) anmelden, falls noch nicht geschehen", bis: d, wer: GF, pflicht: "§ 192 Abs. 1 SGB VII", hinweis: "Die Meldung ist binnen einer Woche nach Beginn des Unternehmens fällig. Eine Gewerbeanzeige in derselben Woche gilt als Meldung." },
@@ -137,11 +151,15 @@ function ersteEinstellung(e: E, heute: string, d: string): Ergebnis {
     { was: "Gefährdungsbeurteilung für den Arbeitsplatz erstellen und festhalten", bis: d, wer: GF, pflicht: "§ 5 Abs. 1 ArbSchG" },
     { was: "Arbeitszeit erfassen: festlegen, wie Beginn, Ende und Dauer aufgezeichnet werden", bis: d, wer: GF, pflicht: "§ 3 Abs. 2 Nr. 1 ArbSchG; BAG, 13.09.2022, 1 ABR 22/21; § 16 Abs. 2 ArbZG",
       hinweis: `Beim Minijob spätestens ${WERTE.milogAufzeichnung.tage} Tage nach dem Arbeitstag aufzeichnen und ${WERTE.milogAufzeichnung.jahre} Jahre aufbewahren (§ 17 Abs. 1 MiLoG).` },
-    { was: `Mindestlohn-Check: Bruttolohn geteilt durch die vereinbarten Stunden muss mindestens ${lohn ?? "den Mindestlohn"} je Stunde ergeben`, bis: d, wer: GF, pflicht: ml.norm, register: ["mindestlohn"] },
+    { was: `Mindestlohn-Check: Bruttolohn geteilt durch die vereinbarten Stunden muss mindestens ${lohn ?? "den Mindestlohn"} je Stunde ergeben`, bis: d, wer: GF, pflicht: ml.norm, register: ["mindestlohn"],
+      ...(neu ? { hinweis: `Ab ${formatDE(neu.gueltigAb!)} gilt ${neu.wert} je Stunde. Vereinbare den Lohn so, dass er dann noch reicht, sonst musst du ihn zu diesem Tag erhöhen.` } : {}) },
     { was: "Lohnsteuer anmelden und abführen, zum ersten Mal nach dem ersten Lohnmonat (über das Lohnbüro)", bis: null, ab: monatsende(d), wer: LB, pflicht: "§ 41a Abs. 1 EStG",
       hinweis: "Spätestens am 10. Tag nach Ende des Anmeldungszeitraums. Der Zeitraum ist Monat, Vierteljahr oder Jahr, je nach Lohnsteuer des Vorjahres (§ 41a Abs. 2 EStG). Welcher für dich gilt, sagt dir das Lohnbüro oder das Finanzamt." },
   ];
-  return { ...basis, schritte: sortiere([...erst, ...basis.schritte]), weiter: [...basis.weiter, "Jeden Monat: ablauf mit art monatsende_lohn."] };
+  return {
+    ...basis, schritte: sortiere([...erst, ...basis.schritte]), weiter: [...basis.weiter, "Jeden Monat: ablauf mit art monatsende_lohn."],
+    fallen: [...(basis.fallen ?? []), ...(ohneTeam ? ["Ohne Team: Schritte mit Buddy und Team entfallen, Aufgaben von Führungskraft, IT und Personal liegen bei der Geschäftsführung. Mit beschaeftigte über 0 kommen sie zurück."] : [])],
+  };
 }
 
 function austritt(e: E, heute: string, d: string): Ergebnis {
@@ -364,13 +382,13 @@ const ABLAEUFE: Record<Art, (e: E, heute: string, d: string) => Ergebnis> = {
   kuendigung_vorbereiten: kuendigungVorbereiten, probezeit_ende: probezeitEndeAblauf, befristung_ende: befristungEnde, monatsende_lohn: monatsendeLohn,
 };
 
-/** Rechnet einen Ablauf. Fehlt eine Pflichtangabe, sagt das Ergebnis welche, statt zu raten. */
+/** Rechnet einen Ablauf. Fehlt eine Pflichtangabe, ist das ein Fehler, der sie nennt, statt zu raten. Schritte mit bis vor heute sind überfällig. */
 function rechne(e: E, heute: string) {
   const a = ARTEN[e.art];
   const fehlt = a.pflicht.filter((k) => e[k as keyof E] === undefined);
-  if (fehlt.length) return { fehlt, a };
+  if (fehlt.length) return fehler(`Für ablauf mit art ${e.art} fehlt: ${fehlt.join(", ")}. datum bedeutet hier: ${a.datum}.`);
   const r = ABLAEUFE[e.art](e, heute, e.datum!);
-  const schritte: Schritt[] = r.schritte.map(({ register: _r, ab: _a, ...s }) => ({ ...s, bis: s.bis ?? null }));
+  const schritte: Schritt[] = r.schritte.map(({ register: _r, ab: _a, ...s }) => ({ ...s, bis: s.bis ?? null, ...(s.bis && s.bis < heute ? { ueberfaellig: true as const } : {}) }));
   const quellen: Quelle[] = r.schritte.flatMap((s) => [...(s.register ?? []).map((id) => registerQuelle(id, heute)), ...normenAus(s.pflicht ?? "").map((n) => normQuelle(n))]);
   return { r, a, schritte, quellen };
 }
@@ -385,7 +403,7 @@ const ablauf: Werkzeug = {
     datum: datum(`Anchor date, meaning per art: ${ART_IDS.map((k) => `${k} = ${ARTEN[k].datum}`).join("; ")}`),
     beschaeftigungsart: text("Type of employment (Beschäftigungsart)", { enum: ["vollzeit", "teilzeit", "werkstudent", "azubi", "minijob", "praktikum"] }),
     befristet: janein("Fixed-term contract (befristet), eintritt and erste_einstellung"),
-    probezeit_monate: zahl("Agreed probation in months (Probezeit), required for probezeit_ende", 0, 12),
+    probezeit_monate: ganzzahl("Agreed probation in whole months (Probezeit), required for probezeit_ende", 0, 12),
     branche_sofortmeldung: text("Sector with immediate registration duty (Sofortmeldung, § 28a Abs. 4 SGB IV) or keine", { enum: [...SOFORTMELDUNG_BEREICHE.map((b) => b.id), "keine"] }),
     drittstaat: janein("Person needs a residence and work permit (Drittstaat)"),
     grund: text("Reason for leaving (Austrittsgrund), required for austritt; arbeitgeber = dismissal by the company", { enum: Object.keys(GRUND_TEXT) }),
@@ -408,11 +426,14 @@ const ablauf: Werkzeug = {
   ausfuehren(roh, heute) {
     const e = { ...roh, branche_sofortmeldung: roh.branche_sofortmeldung === "keine" ? undefined : roh.branche_sofortmeldung } as unknown as E;
     const x = rechne(e, heute);
-    if (!x.r) return antwort({ ergebnis: { art: e.art, fehlt: x.fehlt, datum_bedeutet: x.a.datum } }, heute);
+    const vorbei = x.schritte.filter((s) => s.ueberfaellig).length;
     return antwort({
       ergebnis: { art: e.art, titel: x.a.titel, datum_bedeutet: x.a.datum, ...x.r.daten, schritte: x.schritte },
       quellen: x.quellen,
-      fallen: [...(x.r.fallen ?? []), BIS_HINWEIS],
+      fallen: [
+        ...(vorbei ? [`${vorbei === 1 ? "1 Schritt liegt" : `${vorbei} Schritte liegen`} mit bis vor heute (ueberfaellig): sofort erledigen oder prüfen, ob schon erledigt.`] : []),
+        ...(x.r.fallen ?? []), BIS_HINWEIS,
+      ],
       naechster_schritt: x.r.weiter,
     }, heute);
   },
@@ -424,7 +445,7 @@ const workflow_vorlage: Werkzeug = {
   name: "workflow_vorlage",
   titel: "HR-Workflow",
   beschreibung:
-    "German employment law, Germany only: the ten follow-up workflows of the Lintelly workbench (HR-Workflows), e.g. payroll input deadline, missing onboarding documents, sick leave with eAU and BEM, maternity protection, probation decision, fixed-term contract signed before start. Each shows the chain 'when ... then ...' with default days and roles. Use it as a template for your own reminders. Without kennung it lists all ten.",
+    `German employment law, Germany only: ${WORKFLOWS.length} follow-up workflows for HR tasks (HR-Workflows), e.g. payroll input deadline, missing onboarding documents, sick leave with eAU and BEM, maternity protection, probation decision, fixed-term contract signed before start. Each shows the chain 'when ... then ...' with default days and roles. Use it as a template for your own reminders. Without kennung it lists all.`,
   eingabe: schema({ kennung: text("Key of the workflow, leave out for the list", { enum: WORKFLOWS.map((w) => w.id) }) }),
   ausfuehren(e, heute) {
     const w = WORKFLOWS.find((x) => x.id === e.kennung);
@@ -437,7 +458,7 @@ const workflow_vorlage: Werkzeug = {
         kette: kette(w, tage).map((k) => ({ ...k, dann: k.dann.map((d) => d.replace(" in Mein Lintelly", "")) })),
         tage: Object.values(w.tage).map((t) => ({ was: t.label, standard: t.wert })),
         ...(w.gesundheit ? { vertraulich: "Gesundheit: Aufgaben nur für die Person, die das Personal macht, keine Mitteilung an Führungskräfte." } : {}),
-        einordnung: "So fasst die Lintelly-Werkbank nach. Nimm die Kette als Vorlage für deinen eigenen Ablauf, zum Beispiel mit Erinnerungen im Kalender.",
+        einordnung: "Nimm die Kette als Vorlage für deinen eigenen Ablauf, zum Beispiel mit Erinnerungen im Kalender.",
       },
       naechster_schritt: ["Daten für einen konkreten Fall: ablauf.", merken],
     }, heute);
@@ -474,10 +495,10 @@ export const ABLAUF_VORLAGEN: { art: string; titel: string; markdown: (heute: st
   markdown(heute: string) {
     const e = beispiel(art, heute);
     const x = rechne(e, heute);
-    const zeilen = (x.schritte ?? []).map((s) => `- **${s.bis ? formatDE(s.bis) : "ohne festen Tag"}**: ${ohnePunkt(s.was)}. Wer: ${s.wer}.${s.pflicht ? ` Norm: ${ohnePunkt(s.pflicht)}.` : ""}${s.hinweis ? ` ${s.hinweis}` : ""}`);
+    const zeilen = x.schritte.map((s) => `- **${s.bis ? formatDE(s.bis) : "ohne festen Tag"}**${s.ueberfaellig ? " (überfällig)" : ""}: ${ohnePunkt(s.was)}. Wer: ${s.wer}.${s.pflicht ? ` Norm: ${ohnePunkt(s.pflicht)}.` : ""}${s.hinweis ? ` ${s.hinweis}` : ""}`);
     return [
       `# ${ARTEN[art].titel}`, "", ARTEN[art].wofuer, "", `Beispiel mit ${ARTEN[art].datum} am ${formatDE(e.datum!)}. Die Schritte stehen in zeitlicher Reihenfolge.`, "",
-      ...zeilen, "", ...(x.r?.fallen ?? []).map((f) => `Achtung: ${f}`), "",
+      ...zeilen, "", ...(x.r.fallen ?? []).map((f) => `Achtung: ${f}`), "",
       "Allgemeine Auskunft, keine Rechtsberatung im Einzelfall. Quelle: Lintelly, lintelly.com (CC BY 4.0)", "",
     ].join("\n");
   },

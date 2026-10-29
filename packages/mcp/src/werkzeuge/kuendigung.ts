@@ -2,14 +2,29 @@
  * Kündigungsfrist (§§ 187, 188, 622 BGB) mit der Rechnung der Werkbank (lib/regeln/datum.ts berechneKuendigung, dieselbe wie
  * auf lintelly.com/tools/kuendigungsfrist-rechner) und Klagefrist (§ 4 KSchG, Ende nach § 222 Abs. 2 ZPO auf den nächsten Werktag).
  */
-import { berechneKuendigung, fristEndeWerktag, type Bundesland } from "@/lib/regeln/datum";
+import { berechneKuendigung, compare, fristEndeWerktag, probezeitEnde, type Bundesland, type FristRegel } from "@/lib/regeln/datum";
 import { gii } from "@/lib/regeln/fundstellen";
 import { WERTE } from "@/lib/regeln/werte";
-import { antwort, normQuelle } from "../antwort";
-import { datum, janein, schema, text, zahl } from "../eingabe";
+import { antwort, normQuelle, registerQuelle } from "../antwort";
+import { datum, ganzzahl, janein, schema, text } from "../eingabe";
 import { LAENDER, type Werkzeug } from "../werkzeug";
 
 const BUNDESLAND = text("Federal state of the company for public holidays (Bundesland), e.g. HE", { enum: LAENDER });
+
+/** Rechtswert im Register zur gesetzlichen Fristregel, auch für das Kündigungsschreiben. */
+export const REGEL_WERT: Record<Exclude<FristRegel["art"], "vertrag">, string> = {
+  probezeit: "probezeitKuendigungTage", grundfrist: "grundkuendigungsfristTage", kleinbetrieb: "kleinbetriebKuendigung", staffel: "kuendigungsStaffel",
+};
+
+/**
+ * Probezeit nur, wenn angegeben: Fristrechner und Kündigungsschreiben rechnen ohne Angabe gleich, ohne Probezeit und damit mit der
+ * längeren Frist (Review 29.10.2026: das Schreiben nahm still 6 Monate an und nannte ein zu frühes Ende).
+ */
+export const PROBEZEIT_FELD = ganzzahl("Agreed probation in whole months (Probezeit), 0 for none. If left out, no probation is assumed and the longer notice period applies", 0, 12);
+export const ohneProbezeitHinweis = (e: { eintritt: string; zugang: string; probezeit_monate?: number }) =>
+  e.probezeit_monate === undefined && compare(e.zugang, probezeitEnde(e.eintritt, WERTE.probezeitHoechstMonate.wert)) <= 0
+    ? ["Gerechnet ohne Probezeit, weil probezeit_monate fehlt. Ist eine Probezeit vereinbart und geht die Kündigung in ihr zu, gilt die kürzere Frist von 2 Wochen (§ 622 Abs. 3 BGB). Dann probezeit_monate angeben."]
+    : [];
 
 const kuendigungsfrist_rechnen: Werkzeug = {
   name: "kuendigungsfrist_rechnen",
@@ -20,9 +35,9 @@ const kuendigungsfrist_rechnen: Werkzeug = {
     eintritt: datum("First day of employment"),
     zugang: datum("Day the notice is received by the other side, not the date of the letter"),
     wer_kuendigt: text("Who gives notice, default arbeitgeber", { enum: ["arbeitgeber", "arbeitnehmer"] }),
-    probezeit_monate: zahl("Agreed probation in months, 0 for none", 0, 12),
+    probezeit_monate: PROBEZEIT_FELD,
     kleinbetrieb_vier_wochen: janein("Small business with at most 20 employees that agreed 4 weeks to any day (§ 622 Abs. 5 Nr. 2 BGB)"),
-    vertrag_monate: zahl("Longer notice period in the contract, months", 0, 24),
+    vertrag_monate: ganzzahl("Longer notice period in the contract, whole months", 0, 24),
     vertrag_termin: text("End date of the contractual period", { enum: ["monatsende", "quartalsende"] }),
     staffel_auch_arbeitnehmer: janein("Contract extends the longer statutory periods to resignations too"),
     tarifvertrag: janein("A collective agreement applies (it may set other periods)"),
@@ -48,8 +63,8 @@ const kuendigungsfrist_rechnen: Werkzeug = {
         ende_gesetzlich: r.endeGesetzlich, ...(r.endeVertrag ? { ende_vertrag: r.endeVertrag } : {}),
       },
       rechenweg: r.rechenweg,
-      quellen: [normQuelle("§ 622 BGB", gii("bgb", "622")), normQuelle("§ 187 BGB"), normQuelle("§ 188 BGB")],
-      fallen: r.hinweise.map((h) => h.text),
+      quellen: [registerQuelle(REGEL_WERT[r.gesetzlich.art as keyof typeof REGEL_WERT], heute), normQuelle("§ 622 BGB", gii("bgb", "622")), normQuelle("§ 187 BGB"), normQuelle("§ 188 BGB")],
+      fallen: [...ohneProbezeitHinweis(e as { eintritt: string; zugang: string; probezeit_monate?: number }), ...r.hinweise.map((h) => h.text)],
       naechster_schritt: wer === "arbeitgeber"
         ? ["Sonderkündigungsschutz prüfen (sonderkuendigungsschutz_check).", "Schriftform mit Originalunterschrift und Zugang mit Zeugen planen (kuendigung_pflichtangaben).", "Frist merken: Werkzeug frist_merken."]
         : ["Eingang mit Datum bestätigen, Resturlaub und Zeugnis planen (ablauf mit art austritt)."],

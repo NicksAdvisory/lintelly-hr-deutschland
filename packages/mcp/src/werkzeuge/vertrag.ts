@@ -1,5 +1,5 @@
 /**
- * Vertragsbausteine und rote Liste der Werkbank (lib/vertragsbausteine). Alle 126 Bausteine mit Text, ohne Status-Kennzeichen
+ * Vertragsbausteine und rote Liste der Werkbank (lib/vertragsbausteine). Alle Bausteine mit Text, ohne Status-Kennzeichen
  * (Nick 23.10.2026: „Nein, ohne Status“), immer mit dem Hinweis, dass vor dem Versand ein Mensch prüfen sollte.
  * Der Text entsteht nur, wenn alle Pflichtangaben da sind; halbe Texte mit Lücken gibt es nicht. Statt Namen steht [Name].
  * Die Prüfregeln P-001 bis P-104 auf einen konkreten Vertrag bleiben in der Werkbank.
@@ -10,7 +10,7 @@ import { findeGesperrte, ROTE_LISTE } from "@/lib/vertragsbausteine/rot";
 import { zahl as leseZahl } from "@/lib/vertragsbausteine/hilfen";
 import { GRUPPEN, type Baustein, type Feld, type TextKontext, type Vertragsart, type Werte } from "@/lib/vertragsbausteine/typen";
 import { isISODate } from "@/lib/regeln/datum";
-import { antwort, normQuelle } from "../antwort";
+import { antwort, fehler, normQuelle } from "../antwort";
 import { datum, liste, schema, text, zahl, type Eingabe } from "../eingabe";
 import type { Werkzeug } from "../werkzeug";
 
@@ -73,9 +73,9 @@ function bausteinAntwort(b: Baustein, e: Eingabe, heute: string) {
   const w: Werte = standardWerte(b);
   for (const a of (e.angaben ?? []) as { feld: string; wert: string }[]) {
     const f = felder.find((x) => x.id === a.feld);
-    if (!f) return { fehler: `Unbekannte Angabe ${a.feld.slice(0, 40)}. Möglich: ${felder.map((x) => x.id).join(", ")}` };
-    const fehler = fehlerIn(f, a.wert);
-    if (fehler) return { fehler };
+    if (!f) return fehler(`Unbekannte Angabe ${a.feld.slice(0, 40)}. Möglich: ${felder.map((x) => x.id).join(", ")}`);
+    const falsch = fehlerIn(f, a.wert);
+    if (falsch) return fehler(falsch);
     w[f.id] = a.wert;
   }
   const kontext = e as Kontext;
@@ -127,7 +127,7 @@ const vertragsbausteine_suchen: Werkzeug = {
   name: "vertragsbausteine_suchen",
   titel: "Vertragsbausteine suchen",
   beschreibung:
-    "Search 126 German employment contract clauses (Vertragsbausteine), e.g. home office (Homeoffice), overtime (Überstunden), bonus, company car (Dienstwagen), non-compete (Wettbewerbsverbot), probation (Probezeit). Returns matching clauses with key and when they fit, and void clause types from the red list with the reason and the safe alternative.",
+    `Search ${Object.keys(BAUSTEIN).length} German employment contract clauses (Vertragsbausteine), e.g. home office (Homeoffice), overtime (Überstunden), bonus, company car (Dienstwagen), non-compete (Wettbewerbsverbot), probation (Probezeit). Returns matching clauses with key and when they fit, and void clause types from the red list with the reason and the safe alternative.`,
   eingabe: schema({
     suchtext: text("What the clause should cover, German works best, e.g. Homeoffice", { maxLength: 100 }),
     vertragsart: text("Type of contract, default arbeitsvertrag", { enum: ARTEN }),
@@ -159,9 +159,8 @@ const vertragsbaustein: Werkzeug = {
   }, ["kennung"]),
   ausfuehren(e, heute) {
     const b = BAUSTEIN[String(e.kennung)];
-    if (!b) return antwort({ ergebnis: { gefunden: false, fehler: `Keinen Baustein ${e.kennung} gefunden. Kennungen gehen von A1 bis S…, suche mit vertragsbausteine_suchen.` } }, heute);
+    if (!b) return fehler(`Keinen Baustein ${e.kennung} gefunden. Kennungen gehen von A1 bis S…, suche mit vertragsbausteine_suchen.`);
     const ergebnis = bausteinAntwort(b, e, heute);
-    if ("fehler" in ergebnis) return antwort({ ergebnis }, heute);
     return antwort({
       ergebnis,
       quellen: quellenZu(b),
@@ -176,7 +175,7 @@ const klausel_pruefen: Werkzeug = {
   name: "klausel_pruefen",
   titel: "Klausel gegen die rote Liste lesen",
   beschreibung:
-    "Read one clause of a German employment contract against 17 clause types that are void or prohibited under German law (rote Liste), e.g. all overtime paid with the salary, non-compete without compensation, cut-off periods without exceptions. Returns matches with reason, norm and the safe alternative clause. No match is not a legal review of validity. The text is only read, never stored.",
+    `Read one clause of a German employment contract against ${ROTE_LISTE.length} clause types that are void or prohibited under German law (rote Liste), e.g. all overtime paid with the salary, non-compete without compensation, cut-off periods without exceptions. Returns matches with reason, norm and the safe alternative clause. No match is not a legal review of validity. The text is only read, never stored.`,
   eingabe: schema({ klausel: text("Clause text, up to 3,000 characters", { maxLength: 3000 }) }, ["klausel"]),
   ausfuehren(e, heute) {
     const treffer = findeGesperrte(String(e.klausel)).map((r) => ({ kennung: r.id, klausel: r.klausel, grund: r.grund, alternative: r.alternative, bausteine: r.bausteine }));

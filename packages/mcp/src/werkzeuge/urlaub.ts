@@ -2,8 +2,9 @@
 import { fmt, parseYmd, toYmd } from "../../../kern/website/components/tools/datum";
 import { zahl as dezimal } from "../../../kern/website/components/tools/format";
 import { berechneUrlaub, pruefeWechsel } from "../../../kern/website/components/tools/urlaubsanspruch-logik";
-import { antwort, normQuelle, registerQuelle } from "../antwort";
-import { datum, janein, schema, text, zahl } from "../eingabe";
+import { istFeiertag } from "@/lib/regeln/datum";
+import { antwort, fehler, normQuelle, registerQuelle } from "../antwort";
+import { datum, jahr as jahrFeld, janein, schema, text, zahl } from "../eingabe";
 import type { Werkzeug } from "../werkzeug";
 
 type AnspruchE = {
@@ -20,7 +21,7 @@ const urlaubsanspruch: Werkzeug = {
     jahresurlaub: zahl("Annual leave in the contract for full time, in days of the reference week", 1, 60),
     bezugswoche: text("Reference week of the contract: 5_tage (working days) or 6_tage (Werktage). Default 5_tage", { enum: ["5_tage", "6_tage"] }),
     arbeitstage_pro_woche: zahl("Days with work per week, each day counts fully however short; average for alternating weeks, e.g. 2.5", 0.5, 6),
-    jahr: zahl("Leave year, default the current year", 2000, 2100),
+    jahr: jahrFeld("Leave year, default the current year"),
     eintritt: datum("Entry date if in or after the start of the year, optional"),
     austritt: datum("Last day of employment if in the year, optional"),
     wechsel_ab: datum("Day the number of working days changes, optional"),
@@ -33,9 +34,9 @@ const urlaubsanspruch: Werkzeug = {
     const e = roh as AnspruchE;
     const jahr = e.jahr ?? Number(heute.slice(0, 4));
     const quellen = [registerQuelle("mindesturlaub", heute), registerQuelle("urlaubWartezeitMonate", heute)];
-    if (e.wechsel_ab && e.wechsel_tage === undefined) return antwort({ ergebnis: { fehler: ["Zum Wechsel fehlen die neuen Arbeitstage pro Woche (wechsel_tage)."] }, quellen }, heute);
+    if (e.wechsel_ab && e.wechsel_tage === undefined) return fehler("Zum Wechsel fehlen die neuen Arbeitstage pro Woche (wechsel_tage).");
     const wechselFehler = e.wechsel_ab && pruefeWechsel(e.wechsel_ab, jahr, e.eintritt ?? null, e.austritt ?? null);
-    if (wechselFehler) return antwort({ ergebnis: { fehler: [wechselFehler] }, quellen }, heute);
+    if (wechselFehler) return fehler(wechselFehler);
     let r;
     try {
       r = berechneUrlaub({
@@ -44,7 +45,7 @@ const urlaubsanspruch: Werkzeug = {
         schwerbehindert: e.schwerbehindert ?? false, schwerbehindertAb: e.schwerbehindert_ab ?? null, mehrRegel: e.mehrurlaub ?? "wie-gesetz",
       });
     } catch (f) {
-      return antwort({ ergebnis: { fehler: [(f as Error).message] }, quellen }, heute);
+      return fehler((f as Error).message);
     }
     if (r.gesetzlich.zwoelftel < 12) quellen.push(normQuelle("§ 5 Abs. 1 BUrlG"));
     if (r.zusatz) quellen.push(registerQuelle("zusatzurlaubSchwerbehindert", heute));
@@ -66,10 +67,10 @@ const urlaubsanspruch: Werkzeug = {
 
 /* ---------- Hinweis zum Urlaubsverfall: Logik und Brief aus website/components/tools/urlaubsverfall-hinweis-generator.tsx ---------- */
 
-/** Arbeitstage Montag bis Freitag zwischen zwei Daten (beide eingeschlossen), ohne Feiertage. */
+/** Arbeitstage Montag bis Freitag zwischen zwei Daten (beide eingeschlossen), ohne bundesweite Feiertage. */
 function werktageMoFr(von: Date, bis: Date): number {
   let n = 0;
-  for (const d = new Date(von); d <= bis; d.setUTCDate(d.getUTCDate() + 1)) if (d.getUTCDay() !== 0 && d.getUTCDay() !== 6) n++;
+  for (const d = new Date(von); d <= bis; d.setUTCDate(d.getUTCDate() + 1)) if (d.getUTCDay() !== 0 && d.getUTCDay() !== 6 && !istFeiertag(toYmd(d))) n++;
   return n;
 }
 
@@ -135,7 +136,7 @@ const urlaubsverfall_hinweis: Werkzeug = {
     "German employment law, Germany only: writes the notice an employer must give before unused leave can expire (Hinweis auf Urlaubsverfall, § 7 Abs. 3 BUrlG, BAG 9 AZR 423/16), as a finished letter with placeholders instead of names. Returns open days, expiry date, end of carry-over (Übertragung) and whether the letter comes too late. Use it at the start of the year or in autumn when someone asks how to stop leave from piling up or whether leave expires.",
   eingabe: schema({
     art: text("jahresbeginn (start of year) or erinnerung (autumn reminder). Default by date: from July erinnerung", { enum: ["jahresbeginn", "erinnerung"] }),
-    jahr: zahl("Leave year, default the year of datum", 2020, 2100),
+    jahr: jahrFeld("Leave year, default the year of datum"),
     datum: datum("Date of the letter, must be in the leave year, default today"),
     anspruch: zahl("Leave entitlement of the year in working days", 0.5, 60),
     genommen: zahl("Days already taken, default 0", 0, 60),
@@ -152,13 +153,13 @@ const urlaubsverfall_hinweis: Werkzeug = {
     const j = e.jahr ?? Number((e.datum ?? heute).slice(0, 4));
     const g = e.genommen ?? 0, p = e.geplant ?? 0, regel = e.uebertragung ?? "gesetzlich";
     const vd = regel === "vertraglich" && e.uebertragung_bis ? parseYmd(e.uebertragung_bis) : null;
-    const fehler: string[] = [];
-    if (!d) fehler.push("Das Datum gibt es im Kalender nicht.");
-    if (g + p > e.anspruch) fehler.push("Genommen und geplant liegen über dem Anspruch.");
-    if (regel === "vertraglich" && !vd) fehler.push("Bis wann erlaubt der Vertrag die Übertragung (uebertragung_bis)?");
-    else if (vd && (vd.getUTCFullYear() !== j + 1 || vd < new Date(Date.UTC(j + 1, 2, 31)))) fehler.push(`Die Übertragung endet an einem Datum im Jahr ${j + 1}, frühestens am 31.03.`);
-    if (d && d.getUTCFullYear() !== j) fehler.push(`Das Schreiben muss im Urlaubsjahr ${j} kommen.`);
-    if (fehler.length || !d) return antwort({ ergebnis: { fehler }, quellen }, heute);
+    const falsch: string[] = [];
+    if (!d) falsch.push("Das Datum gibt es im Kalender nicht.");
+    if (g + p > e.anspruch) falsch.push("Genommen und geplant liegen über dem Anspruch.");
+    if (regel === "vertraglich" && !vd) falsch.push("Bis wann erlaubt der Vertrag die Übertragung (uebertragung_bis)?");
+    else if (vd && (vd.getUTCFullYear() !== j + 1 || vd < new Date(Date.UTC(j + 1, 2, 31)))) falsch.push(`Die Übertragung endet an einem Datum im Jahr ${j + 1}, frühestens am 31.03.`);
+    if (d && d.getUTCFullYear() !== j) falsch.push(`Das Schreiben muss im Urlaubsjahr ${j} kommen.`);
+    if (falsch.length || !d) return fehler(...falsch);
 
     const art = e.art ?? (d.getUTCMonth() >= 6 ? "erinnerung" : "jahresbeginn");
     const b = hinweisBrief({ jahr: j, anspruch: e.anspruch, genommen: g, geplant: p, vorjahr: e.vorjahr ?? 0, regel, vertragDatum: vd, datum: d, art, sie: e.ansprache !== "du" });
@@ -177,7 +178,7 @@ const urlaubsverfall_hinweis: Werkzeug = {
         regel === "gesetzlich"
           ? `Verfall mit Ablauf des ${fmt(b.ende)} (§ 7 Abs. 3 BUrlG), bei Übertragung aus dringenden Gründen mit Ablauf des ${fmt(b.uebertragEnde)}.`
           : `Nach dem Vertrag kann offener Urlaub bis ${fmt(b.uebertragEnde)} übertragen werden und verfällt danach.`,
-        `Zwischen Schreiben und Verfall liegen ${verfuegbar} Arbeitstage (Montag bis Freitag, ohne Feiertage).`,
+        `Zwischen Schreiben und Verfall liegen ${verfuegbar} Arbeitstage (Montag bis Freitag, ohne bundesweite Feiertage).`,
         ...(b.zeigeVorjahr ? [`Rest aus ${j - 1}: ${dezimal(e.vorjahr!)} Tage, zu nehmen bis ${fmt(b.vorjahrEnde)}.`] : []),
       ],
       quellen,

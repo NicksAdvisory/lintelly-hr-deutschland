@@ -32,6 +32,21 @@ describe("arbeitgeberkosten", () => {
     expect(a.ergebnis.summe_arbeitgeber).toBeNull();
     expect(a.fallen.join(" ")).toMatch(/603/);
   });
+  it("Minijob 2027: keine Zahl mit der KV-Pauschale von 2026, ehrlicher Hinweis (Review 29.10.2026)", () => {
+    const a = rufe("arbeitgeberkosten", { art: "minijob", brutto_monat: 500, stichtag: "2027-02-01" });
+    expect(a.ergebnis).toMatchObject({ summe_arbeitgeber: null });
+    expect(a.ergebnis).not.toHaveProperty("posten");
+    expect(a.fallen.join(" ")).toMatch(/rechnet Lintelly HR noch nicht/);
+    expect(a.fallen.join(" ")).not.toMatch(/erst im Herbst/);
+  });
+  it("2027: vorläufige Werte einmal je Hinweis und mit Namen", () => {
+    const f: string[] = rufe("arbeitgeberkosten", { art: "vollzeit", brutto_monat: 3000, stichtag: "2027-02-01" }).fallen;
+    const v = f.filter((x) => x.startsWith("Vorläufig"));
+    expect(v.length).toBeGreaterThan(0);
+    expect(new Set(v).size).toBe(v.length);
+    expect(v.join(" ")).toMatch(/Beitragssatz Kranken- und Pflegeversicherung/);
+    expect(f.filter((x) => /^Wert /.test(x))).toEqual([]);
+  });
   it("Werkstudent 2.500 €: nur Rentenversicherung, 9,3 % = 232,50 €", () => {
     const e = rufe("arbeitgeberkosten", { art: "werkstudent", brutto_monat: 2500, stichtag: "2026-11-01" }).ergebnis;
     expect(e.posten).toEqual([{ name: "Rentenversicherung (Hälfte)", satz: 0.093, basis: 2500, betrag: 232.5 }]);
@@ -66,6 +81,7 @@ describe("frist_merken", () => {
     expect(e.link).toBe("https://lintelly.com/tools/probezeit-rechner");
     expect(e.kalender_ics).toMatch(/DTSTART;VALUE=DATE:20261231/);
     expect(e.erinnerung_moeglich).toEqual([7, 1, 0]);
+    expect(e.kalender_ics).toMatch(/BEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER:-P6DT15H\r\nDESCRIPTION:In 7 Tagen: Ende der Probezeit\r\nEND:VALARM\r\nEND:VEVENT/);
   });
   it("Frist in der Vergangenheit: keine Erinnerung mehr möglich", () => {
     expect(rufe("frist_merken", { datum: "2026-10-01", frist: "Ende der Probezeit" }).ergebnis.erinnerung_moeglich).toEqual([]);

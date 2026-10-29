@@ -7,8 +7,8 @@ import { zahl as dezimal } from "../../../kern/website/components/tools/format";
 import { berechneFehlgeburt, berechneGeburt } from "../../../kern/website/components/tools/mutterschutz-logik";
 import { hm, pruefeTage, STAND_2026 as PAUSEN } from "../../../kern/website/components/tools/pausen-logik";
 import { berechneProbezeit } from "../../../kern/website/components/tools/probezeit-logik";
-import { antwort, normQuelle, registerQuelle } from "../antwort";
-import { datum, janein, liste, schema, text, zahl } from "../eingabe";
+import { antwort, fehler, normQuelle, registerQuelle } from "../antwort";
+import { datum, ganzzahl, janein, liste, schema, text, zahl } from "../eingabe";
 import type { Werkzeug } from "../werkzeug";
 
 /** Hinweis auf „Frist merken“ (lintelly.com), dort heißt die Frist wie auf der Seite. */
@@ -23,7 +23,7 @@ const probezeit: Werkzeug = {
     "German employment law, Germany only: end of the probation period (Probezeit) from the first working day, the last day a dismissal with 2 weeks notice can be delivered (§ 622 Abs. 3 BGB), when protection against dismissal (Kündigungsschutz, KSchG) starts and dates for the review meeting. Covers apprenticeships (Ausbildung, BBiG) and fixed-term contracts (Befristung). Use it when someone asks when a probation period ends or until when they can still dismiss with the short notice.",
   eingabe: schema({
     beginn: datum("First working day according to the contract"),
-    dauer: zahl("Length of the probation period as a whole number, unit see einheit", 1, 26),
+    dauer: ganzzahl("Length of the probation period as a whole number, unit see einheit", 1, 26),
     einheit: text("Unit of dauer, default monate", { enum: ["monate", "wochen"] }),
     beschaeftigte: zahl("Employees in the business, part-time counted pro rata, apprentices not counted (§ 23 KSchG). Leave out if unknown", 0, 100000),
     befristet_bis: datum("End date if the contract is fixed-term (Befristung)"),
@@ -41,7 +41,7 @@ const probezeit: Werkzeug = {
       beginn: e.beginn, einheit: e.einheit ?? "monate", dauer: e.dauer, befristet: !!e.befristet_bis, befristetBis: e.befristet_bis ?? "", groesse, azubi,
     });
     const r = res.ergebnis;
-    if (!r) return antwort({ ergebnis: { fehler: Object.values(res.fehler ?? {}) as string[] }, quellen }, heute);
+    if (!r) return fehler(...(Object.values(res.fehler ?? {}) as string[]));
 
     const vorbei = toYmd(r.ende) < heute;
     const wochenende = +r.zugangEmpf !== +r.ende;
@@ -140,9 +140,9 @@ const befristung: Werkzeug = {
       gruendung: e.gruendung ?? "", ab52: e.ab52 ?? false, rente: e.regelaltersgrenze ?? false, schrift: e.schriftform ?? "unklar", heute: parseYmd(heute)!,
     });
     const quellen = [registerQuelle("befristungSachgrundlosMonate", heute), registerQuelle("befristungVerlaengerungenMax", heute), registerQuelle("befristungSchriftform", heute)];
-    if (r.maxEnde === undefined) return antwort({ ergebnis: { fehler: Object.values(r.errors ?? {}) as string[] }, quellen }, heute);
-    const fehler = [...Object.values(r.errors), ...Object.entries(r.vErr).map(([id, f]) => `Verlängerung ${id}: ${f}`)];
-    if (fehler.length) return antwort({ ergebnis: { fehler }, quellen }, heute);
+    if (r.maxEnde === undefined) return fehler(...(Object.values(r.errors ?? {}) as string[]));
+    const falsch = [...Object.values(r.errors), ...Object.entries(r.vErr).map(([id, f]) => `Verlängerung ${id}: ${f}`)];
+    if (falsch.length) return fehler(...falsch);
 
     const texte = r.msgs.map((m) => m.text ?? "").join(" ");
     if (e.vorbeschaeftigung === "arbeit" && !e.regelaltersgrenze) quellen.push(registerQuelle("vorbeschaeftigungVerbot", heute));
@@ -218,12 +218,11 @@ const elternzeit_fristen: Werkzeug = {
     const g = toDay(e.geburt), b = toDay(e.beginn), en = toDay(e.ende), z = e.antrag_zugang ? toDay(e.antrag_zugang) : null;
     const et = mutter && !e.noch_nicht_geboren && e.errechneter_termin ? toDay(e.errechneter_termin) : null;
     const quellen = [registerQuelle("elternzeitAnmeldungWochen", heute), registerQuelle("elternzeitSchutzVorherWochen", heute), normQuelle("§ 15 Abs. 2 BEEG")];
-    if ([g, b, en, z, et].some((x) => Number.isNaN(x))) return antwort({ ergebnis: { fehler: ["Eines der Daten gibt es im Kalender nicht."] }, quellen }, heute);
     const r = berechneElternzeit({
       geburt: g, et, elternteil: mutter ? "mutter" : "anderer", mutterschutz12: e.mutterschutz_12_wochen ?? false,
       beginn: b, ende: en, zugang: z, teilzeit: e.teilzeit ?? false, urlaub: e.jahresurlaub ?? null, heute: toDay(heute),
     });
-    if (r.fehler.length) return antwort({ ergebnis: { fehler: r.fehler }, quellen, fallen: r.warnungen }, heute);
+    if (r.fehler.length) return fehler(...r.fehler);
 
     const a0 = r.abschnitte[0];
     const textform = g >= TEXTFORM_AB;
@@ -306,7 +305,7 @@ const mutterschutz: Werkzeug = {
     mehrlinge: janein("Twins or more (12 weeks after birth)"),
     behinderung: janein("Disability of the child certified within 8 weeks, on request (12 weeks after birth)"),
     fehlgeburt_am: datum("Date of the miscarriage or stillbirth"),
-    schwangerschaftswoche: zahl("Week of pregnancy at the miscarriage, the 13th week starts after 12 completed weeks", 1, 45),
+    schwangerschaftswoche: ganzzahl("Week of pregnancy at the miscarriage, the 13th week starts after 12 completed weeks", 1, 45),
     ab_500_gramm: janein("Weight at least 500 grams, then it counts as stillbirth even before week 24"),
   }),
   ausfuehren(roh, heute) {
@@ -314,8 +313,8 @@ const mutterschutz: Werkzeug = {
     if (e.fall === "fehlgeburt") {
       const quellen = [registerQuelle("mutterschutzFehlgeburt", heute), registerQuelle("mutterschutzFehlgeburtVerbot", heute)];
       const f = berechneFehlgeburt({ datum: e.fehlgeburt_am ?? "", ssw: e.schwangerschaftswoche === undefined ? "" : String(e.schwangerschaftswoche), ab500: e.ab_500_gramm ?? false, et: e.errechneter_termin });
-      if (!f) return antwort({ ergebnis: { fehler: ["Es fehlen Datum und Schwangerschaftswoche."] }, quellen }, heute);
-      if (f.d === undefined) return antwort({ ergebnis: { fehler: Object.values(f.errors) }, quellen }, heute);
+      if (!f) return fehler("Es fehlen Datum und Schwangerschaftswoche.");
+      if (f.d === undefined) return fehler(...Object.values(f.errors));
       if (f.totgeburt) {
         const min = f.mindestens ? "mindestens " : "";
         quellen.push(registerQuelle("mutterschutzNachTage", heute), registerQuelle("mutterschutzKuendigungsverbotMonate", heute), normQuelle("§ 1 Abs. 2 AAG"));
@@ -359,8 +358,8 @@ const mutterschutz: Werkzeug = {
 
     const quellen = [registerQuelle("mutterschutzVorTage", heute), registerQuelle("mutterschutzNachTage", heute)];
     const g = berechneGeburt({ et: e.errechneter_termin ?? "", geb: e.geburt ?? "", frueh: e.fruehgeburt ?? false, mehr: e.mehrlinge ?? false, beh: e.behinderung ?? false });
-    if (!g) return antwort({ ergebnis: { fehler: ["Es fehlt der errechnete Entbindungstermin."] }, quellen }, heute);
-    if (g.phasen === undefined) return antwort({ ergebnis: { fehler: Object.values(g.errors) }, quellen }, heute);
+    if (!g) return fehler("Es fehlt der errechnete Entbindungstermin.");
+    if (g.phasen === undefined) return fehler(...Object.values(g.errors));
     if (g.lang) quellen.push(registerQuelle("mutterschutzNachTageVerlaengert", heute));
     if (g.verkuerzt) quellen.push(registerQuelle("mutterschutzVorzeitig", heute));
     quellen.push(
@@ -433,11 +432,9 @@ const aufbewahrungsfristen: Werkzeug = {
     const streit = e.verfahren_laeuft ?? false;
     const h = parseYmd(heute)!;
     const d = e.datum ? parseYmd(e.datum) : null;
-    const ungueltig = (fehler: string) => antwort({ ergebnis: { fehler: [fehler] } }, heute);
-    if (e.datum && !d) return ungueltig("Das Datum gibt es im Kalender nicht.");
 
     if (e.modus === "austritt") {
-      if (!d) return ungueltig("Es fehlt das Austrittsdatum (datum).");
+      if (!d) return fehler("Es fehlt das Austrittsdatum (datum).");
       const plan = loeschplan(d);
       return antwort({
         ergebnis: {
@@ -456,7 +453,7 @@ const aufbewahrungsfristen: Werkzeug = {
     }
 
     const typ = DOKUMENTE.find((x) => x.id === e.dokument);
-    if (!typ) return ungueltig("Es fehlt die Unterlage (dokument), oder nimm modus austritt für den Löschplan.");
+    if (!typ) return fehler("Es fehlt die Unterlage (dokument), oder nimm modus austritt für den Löschplan.");
     const quellen = NORMEN[typ.id].map((n) => normQuelle(n));
     const kopf = { dokument: typ.label, frist: typ.frist, grundlage: typ.grundlage };
     if (typ.regel.art === "keine") {
@@ -467,9 +464,9 @@ const aufbewahrungsfristen: Werkzeug = {
         fallen: ["Mitarbeitende können die Entfernung verlangen, wenn die Abmahnung inhaltlich falsch ist, auf falschen Tatsachen beruht oder für das Arbeitsverhältnis keine Rolle mehr spielt. Viele Firmen prüfen nach 2 bis 3 Jahren ohne weiteren Vorfall, ob sie noch gebraucht wird. Das ist Praxis, kein Gesetz. Nach dem Austritt gilt die Frist der Personalakte."],
       }, heute);
     }
-    if (!d) return ungueltig(`Es fehlt das Datum: ${typ.datum}.`);
+    if (!d) return fehler(`Es fehlt das Datum: ${typ.datum}.`);
     const p = pruefungLesen(e.pruefung_zeitraum_bis ? parseYmd(e.pruefung_zeitraum_bis) : null, e.pruefung_am ? parseYmd(e.pruefung_am) : null);
-    if (p.fehler) return ungueltig(p.fehler);
+    if (p.fehler) return fehler(p.fehler);
     const pr = p.pruefung;
     // Verbindlich ist bei Entgeltunterlagen die spätere von SV-Frist und steuerlicher Frist (lintelly.com 28.10.2026).
     const f = verbindlicheFrist(typ, d, pr);
@@ -533,8 +530,8 @@ const pausen: Werkzeug = {
     const quellen = jugend
       ? [registerQuelle("jugendlicheBisJahre", heute), normQuelle("§ 8 JArbSchG"), normQuelle("§ 11 JArbSchG"), normQuelle("§ 13 JArbSchG")]
       : [registerQuelle("arbzgPause6", heute), registerQuelle("arbzgRuhezeit", heute), registerQuelle("hoechstarbeitszeitWoche", heute), ...(ausnahme ? [normQuelle("§ 5 Abs. 2 ArbZG")] : [])];
-    const fehler = r.ergebnisse.filter((x) => x.fehler).map((x) => `${x.label}: ${x.fehler}`);
-    if (!r.voll.length) return antwort({ ergebnis: { fehler: fehler.length ? fehler : ["Trag mindestens eine Schicht mit Beginn und Ende ein."] }, quellen }, heute);
+    const falsch = r.ergebnisse.filter((x) => x.fehler).map((x) => `${x.label}: ${x.fehler}`);
+    if (!r.voll.length) return fehler(...(falsch.length ? falsch : ["Trag mindestens eine Schicht mit Beginn und Ende ein."]));
 
     const R = jugend ? PAUSEN.jug : PAUSEN.erw;
     const std = (min: number) => dezimal(min / 60);
@@ -554,7 +551,7 @@ const pausen: Werkzeug = {
       ],
       quellen,
       fallen: [
-        ...fehler,
+        ...falsch,
         ...r.voll.flatMap((x) => x.msgs.filter((m) => m.level !== "ok").map((m) => `${x.label}: ${m.text}`)),
         ...(r.wocheMsg ? [r.wocheMsg.text] : []),
         `Stand ${PAUSEN.stand}: Die Bundesregierung plant eine Reform des Arbeitszeitgesetzes mit einer wöchentlichen statt täglichen Höchstarbeitszeit. Bisher liegt nur ein Referentenentwurf vor, bis zu einem Beschluss gilt das aktuelle Recht.`,

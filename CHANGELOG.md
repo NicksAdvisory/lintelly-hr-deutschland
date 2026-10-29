@@ -24,6 +24,19 @@ Versionen nach SemVer. Jede Version geht über die Release-Pipeline auf npm, ghc
   - Urlaubsanspruch: Wechsel der Arbeitstage außerhalb des Beschäftigungszeitraums ist ein Fehler.
   - Stellenanzeige: keine Fehlalarme mehr bei „Kein Foto nötig“, „junge Familien“, „Kinder unter 12 Jahren“.
 
+### Korrekturen aus der Prüfung vom 29.10.2026
+
+- Daten müssen echte Kalendertage zwischen 1950 und 2100 sein. Vorher wurde 2026-02-30 weitergerechnet, und ein Ende ab 2199-12-31 ließ den Server endlos rechnen (Monatsschleife in `components/tools/datum.ts` der Website).
+- Eine Fehlerform für alles: `isError` mit `{ fehler: [...] }`. Kein `ergebnis.fehler` mehr, fehlende Angaben bei `ablauf` sind ebenfalls ein Fehler. Jede Antwort zusätzlich als `structuredContent` mit `outputSchema`; unbekannte Prompts und Ressourcen melden „ungültige Angabe“.
+- `kuendigungsschreiben` nimmt ohne Angabe keine Probezeit von 6 Monaten mehr an, sondern rechnet wie `kuendigungsfrist_rechnen` ohne Probezeit und sagt das.
+- `sonderkuendigungsschutz_check`: offene Fragen ergeben nie „grün“, sondern „gelb“ mit „X Fragen offen“. Beschreibung von `laenger_als_6_monate` ohne Widerspruch.
+- Minijob ab 2027: keine Kosten mit der KV-Pauschale 2026, sondern ein Hinweis, bis der Wert im Register steht. Vorläufige Werte in `arbeitgeberkosten` einmal und mit Namen.
+- `ablauf`: Schritte vor heute als `ueberfaellig`, erste Einstellung ohne Team ohne Buddy, Team und Betriebsrat, Mindestlohn-Check nennt eine Erhöhung in den nächsten 3 Monaten, keine doppelten Quellen.
+- Ländersperre nur noch in kurzen Feldern (Suche): Klauseln und Stellenanzeigen dürfen Länder und Straßennamen enthalten.
+- Keine Werbung mehr in der Server-Anweisung und in `workflow_vorlage`.
+- Kleinere Punkte: „Germany only“ genau einmal je Beschreibung, ganze Zahlen als Ganzzahl-Feld (Jahr auch als Text), Daten in Hinweisen als JJJJ-MM-TT, Quellen mit Prüfdatum und Status, wenn die Norm im Register steht, `urlaubsverfall_hinweis` ohne bundesweite Feiertage, `rechtsaenderungen` ohne gleichbleibende Werte, `frist_merken` mit Erinnerung 7 Tage vorher, `schwellen_check` mit § 22 Abs. 1 Satz 3 SGB VII, Zahlen in Beschreibungen aus den Daten.
+- Tests: Beispiele und Rauchtest prüfen auf Fehler, neue Tests für Daten, Fehlerform, Sonderschutz, Kündigungsschreiben gegen Fristrechner, Ländersperre, überfällige Schritte, alle 8 Versionsstellen.
+
 ## 0.2.2
 
 - Werkzeugbeschreibungen ohne Verweise auf andere Werkzeuge und ohne Anweisungen an das Modell (Richtlinie des Anthropic-Verzeichnisses). Die Reihenfolge steht weiter in den Server-Anweisungen und in den Skills des Plugins.

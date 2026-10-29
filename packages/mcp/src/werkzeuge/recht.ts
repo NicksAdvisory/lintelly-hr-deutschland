@@ -54,7 +54,7 @@ const rechtswerte_suchen: Werkzeug = {
   name: "rechtswerte_suchen",
   titel: "Rechtswerte suchen",
   beschreibung:
-    "Search the register of German employment law values (215 values with norm, official source and review date): minimum wage, mini-job limit, notice periods, probation, holiday, sick pay, maternity protection, retention periods, thresholds. Returns up to 20 matches with key, title, value on the date and status.",
+    `Search the register of German employment law values (${OEFFENTLICH.length} values with norm, official source and review date): minimum wage, mini-job limit, notice periods, probation, holiday, sick pay, maternity protection, retention periods, thresholds. Returns up to 20 matches with key, title, value on the date and status.`,
   eingabe: schema({
     suchtext: text("Words to search for, German or key, e.g. Mindestlohn, Urlaub, Aufbewahrung", { maxLength: 100 }),
     gebiet: text("Optional area of law", { enum: GEBIETE }),
@@ -86,7 +86,8 @@ const rechtsaenderungen: Werkzeug = {
     const bis = (e.bis as string | undefined) ?? `${Number(von.slice(0, 4)) + 1}${von.slice(4)}`;
     const imZeitraum = (d: string | null) => !!d && d >= von && d <= bis;
     const aenderungen = OEFFENTLICH.flatMap((x) => x.werte.flatMap((w, i) => {
-      if (w.ausstehend || !imZeitraum(w.gueltigAb) || i === 0) return [];
+      // Gleicher Wert mit neuem Datum ist keine Änderung (Review 29.10.2026: „2,6 % statt 2,6 %“).
+      if (w.ausstehend || !imZeitraum(w.gueltigAb) || i === 0 || w.wert === x.werte[i - 1].wert) return [];
       return [{ kennung: x.id, titel: x.titel, ab: w.gueltigAb!, neu: w.wert, vorher: x.werte[i - 1].wert, norm: x.norm }];
     })).sort((a, b) => a.ab.localeCompare(b.ab));
     const ausstehend = OEFFENTLICH.flatMap((x) => x.werte.filter((w) => w.ausstehend && imZeitraum(w.gueltigAb))

@@ -30,7 +30,7 @@ describe("urlaubsanspruch", () => {
   });
   it("Schwerbehinderung Vollzeit: +5", () => expect(u({ schwerbehindert: true }).ergebnis.gesamt_tage).toBe(35));
   it("Austritt vor Eintritt ist ein Fehler, 7 Arbeitstage lehnt schon die Eingabe ab", () => {
-    expect(u({ eintritt: "2026-05-01", austritt: "2026-04-01" }).ergebnis.fehler[0]).toMatch(/vor dem Eintritt/);
+    expect(() => u({ eintritt: "2026-05-01", austritt: "2026-04-01" })).toThrow(/vor dem Eintritt/);
     expect(() => u({ arbeitstage_pro_woche: 7 })).toThrow();
   });
 });
@@ -39,7 +39,7 @@ describe("urlaubsverfall_hinweis", () => {
   const h = (o: Record<string, unknown>) => rufe("urlaubsverfall_hinweis", { jahr: 2026, datum: "2026-10-23", anspruch: 30, genommen: 18, geplant: 5, ...o });
   it("Herbst-Erinnerung: 7 Tage offen, Verfall 31.12.2026, fertiger Brief mit Platzhaltern statt Namen", () => {
     const a = h({});
-    expect(a.ergebnis).toMatchObject({ offen_tage: 7, verfall_am: "2026-12-31", uebertragung_bis: "2027-03-31", arbeitstage_bis_verfall: 49, schreiben_kommt_spaet: false, art: "erinnerung" });
+    expect(a.ergebnis).toMatchObject({ offen_tage: 7, verfall_am: "2026-12-31", uebertragung_bis: "2027-03-31", arbeitstage_bis_verfall: 48, schreiben_kommt_spaet: false, art: "erinnerung" });
     const t: string = a.ergebnis.text;
     expect(t).toContain("Erinnerung: Ihr Resturlaub 2026 und sein Verfall");
     expect(t).toContain("Guten Tag [Vorname Nachname],");
@@ -53,7 +53,7 @@ describe("urlaubsverfall_hinweis", () => {
   });
   it("Schreiben im Dezember kommt zu spät, wenn die offenen Tage kaum noch nehmbar sind", () => {
     const a = h({ datum: "2026-12-15", genommen: 10, geplant: 0 });
-    expect(a.ergebnis).toMatchObject({ offen_tage: 20, arbeitstage_bis_verfall: 12, schreiben_kommt_spaet: true });
+    expect(a.ergebnis).toMatchObject({ offen_tage: 20, arbeitstage_bis_verfall: 11, schreiben_kommt_spaet: true });
     expect(a.fallen?.[0]).toMatch(/kommt spät/);
   });
   it("du-Ansprache, Jahresbeginn, Vorjahresrest und vertragliche Übertragung bis 30.06.", () => {
@@ -66,8 +66,8 @@ describe("urlaubsverfall_hinweis", () => {
     expect(a.naechster_schritt?.join(" ")).toMatch(/Erinnerung im Kalender: 01\.10\.2026/);
   });
   it("Fehler: vertraglich ohne Datum, Schreiben außerhalb des Urlaubsjahres, mehr verplant als Anspruch", () => {
-    expect(h({ uebertragung: "vertraglich" }).ergebnis.fehler.join(" ")).toMatch(/Übertragung/);
-    expect(h({ datum: "2025-12-01" }).ergebnis.fehler.join(" ")).toMatch(/Urlaubsjahr 2026/);
-    expect(h({ genommen: 28, geplant: 5 }).ergebnis.fehler.join(" ")).toMatch(/über dem Anspruch/);
+    expect(() => h({ uebertragung: "vertraglich" })).toThrow(/Übertragung/);
+    expect(() => h({ datum: "2025-12-01" })).toThrow(/Urlaubsjahr 2026/);
+    expect(() => h({ genommen: 28, geplant: 5 })).toThrow(/über dem Anspruch/);
   });
 });

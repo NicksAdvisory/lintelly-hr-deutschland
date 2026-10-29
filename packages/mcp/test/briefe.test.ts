@@ -10,6 +10,15 @@ const STRICH = /[–—]| - /;
 const KLAGE = `${WERTE.kschgKlageWochen.wert} Wochen`;
 
 describe("kuendigungsschreiben", () => {
+  it("gleiche Eingabe, gleiches Ende wie kuendigungsfrist_rechnen, ohne Angabe ohne Probezeit (Review 29.10.2026)", () => {
+    for (const ein of [{ eintritt: "2026-06-01", zugang: "2026-10-29" }, { eintritt: "2026-06-01", zugang: "2026-10-29", probezeit_monate: 6 }, { eintritt: "2018-02-01", zugang: "2026-10-29" }]) {
+      const brief = rufe("kuendigungsschreiben", ein), frist = rufe("kuendigungsfrist_rechnen", ein);
+      expect(brief.ergebnis.ende, JSON.stringify(ein)).toBe(frist.ergebnis.ende);
+    }
+    const a = rufe("kuendigungsschreiben", { eintritt: "2026-06-01", zugang: "2026-10-29" });
+    expect(a.ergebnis.ende).toBe("2026-11-30");
+    expect(a.fallen.join(" ")).toMatch(/Gerechnet ohne Probezeit/);
+  });
   const basis = { eintritt: "2023-06-19", zugang: "2026-10-26" };
 
   it("3 Jahre dabei: 1 Monat zum Monatsende, Ende 30.11.2026, Folgetermine mit spätestem Zugang", () => {
@@ -27,9 +36,9 @@ describe("kuendigungsschreiben", () => {
 
   it("rechnet wie die Seite: gleiche Eingabe, gleiches Ende und gleiche Termine wie berechneKuendigung auf lintelly.com", () => {
     const faelle = [
-      { ein: { eintritt: "2026-09-01", zugang: "2026-10-26" }, seite: { probezeitMonate: 6 } },
-      { ein: { eintritt: "2020-01-01", zugang: "2026-10-26", vertragsfrist: "quartalsende", vertragsfrist_monate: 3 }, seite: { probezeitMonate: 6, vertrag: { monate: 3, termin: "quartalsende" as const } } },
-      { ein: { eintritt: "2026-01-01", zugang: "2026-10-26", kleinbetrieb_vier_wochen: true }, seite: { probezeitMonate: 6, kleinbetriebVierWochen: true } },
+      { ein: { eintritt: "2026-09-01", zugang: "2026-10-26", probezeit_monate: 6 }, seite: { probezeitMonate: 6 } },
+      { ein: { eintritt: "2020-01-01", zugang: "2026-10-26", vertragsfrist: "quartalsende", vertragsfrist_monate: 3 }, seite: { vertrag: { monate: 3, termin: "quartalsende" as const } } },
+      { ein: { eintritt: "2026-01-01", zugang: "2026-10-26", kleinbetrieb_vier_wochen: true }, seite: { kleinbetriebVierWochen: true } },
       { ein: { eintritt: "2024-12-01", zugang: "2026-10-03", probezeit_monate: 0 }, seite: { probezeitMonate: 0 } },
     ];
     for (const f of faelle) {
@@ -92,7 +101,7 @@ describe("kuendigungsschreiben", () => {
   });
 
   it("Zugang vor dem Briefdatum und Freistellung nach dem Ende werden gemeldet", () => {
-    expect(rufe("kuendigungsschreiben", { ...basis, briefdatum: "2026-10-27" }).ergebnis.fehler).toBe("Zugang liegt vor dem Datum des Schreibens.");
+    expect(() => rufe("kuendigungsschreiben", { ...basis, briefdatum: "2026-10-27" })).toThrow("Zugang liegt vor dem Datum des Schreibens.");
     const a = rufe("kuendigungsschreiben", { ...basis, freistellung: "widerruflich", freistellung_ab: "2026-12-01" });
     expect(a.fallen).toContain("Die Freistellung beginnt nach dem Ende des Arbeitsverhältnisses. Prüf das Datum.");
   });
@@ -218,7 +227,7 @@ describe("kuendigung_pflichtangaben", () => {
 
   it("Quellen aus dem Register, Band Firmengröße, Hinweis vor dem Versand, kein Gedankenstrich, unbekanntes Feld abgelehnt", () => {
     const a = rufe("kuendigung_pflichtangaben", { beschaeftigte: 7, betriebsrat: true });
-    expect(a.quellen.map((q) => q.norm)).toEqual(expect.arrayContaining(["§ 623 BGB", "§ 23 Abs. 1 KSchG", "§ 4 Satz 1 KSchG", "§ 102 BetrVG", "§ 109 GewO"]));
+    expect(a.quellen.map((q) => q.norm)).toEqual(expect.arrayContaining(["§ 623 BGB", "§ 23 Abs. 1 KSchG", "§ 4 Satz 1 KSchG", "§ 102 Abs. 2 BetrVG", "§ 109 GewO"]));
     expect(a).not.toHaveProperty("lintelly");
     expect(a.hinweis).toBe(HINWEIS);
     expect(JSON.stringify(a)).not.toMatch(STRICH);
