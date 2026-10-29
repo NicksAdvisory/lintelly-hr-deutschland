@@ -13,8 +13,11 @@ Environment=PORT=3610
 Environment=ZAEHLER_ORDNER=/home/nick/lintelly-hr/zaehler
 EnvironmentFile=-/home/nick/lintelly-hr/env
 ExecStart=/usr/bin/node /home/nick/lintelly-hr/aktuell/lintelly-hr-mcp-server.mjs --http
-Restart=on-failure
+# always: auch nach einem sauberen Ende wieder hoch; der Wächter im Dienst (waechter.ts) beendet ihn bei einem Hänger hart.
+# TimeoutStopSec: ein hängender Prozess reagiert nicht auf SIGTERM, nach 10 s statt 90 s kommt SIGKILL (Neustart durch health-ping.sh).
+Restart=always
 RestartSec=3
+TimeoutStopSec=10
 MemoryMax=300M
 NoNewPrivileges=true
 PrivateTmp=true

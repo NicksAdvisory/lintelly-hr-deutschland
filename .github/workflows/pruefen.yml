@@ -16,6 +16,7 @@ jobs:
       - run: npm run check
       - run: npm run build
       - name: Rauchtest
+        env: { RAUCHTEST_USER_AGENT: lintelly-rauchtest }
         run: |
           node packages/mcp/dist/lintelly-hr-mcp-server.mjs --http --port 8787 &
           sleep 2

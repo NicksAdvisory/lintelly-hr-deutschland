@@ -2,12 +2,17 @@
  * Streamable HTTP ohne Sitzung (wie /mcp der Werkbank): nur POST, Antworten als JSON. Dazu /health für die Überwachung und
  * /.well-known/openai-apps-challenge für den Domain-Nachweis bei OpenAI (Text aus OPENAI_APPS_CHALLENGE). Anfragen höchstens 32 KB.
  * Kein Log der Eingaben: Fehler werden nur als Art gezählt, nie mit Inhalt geschrieben.
+ * Sammelanfragen (JSON-RPC-Batch, ein Array) lehnt der Dienst mit 400 ab: die MCP-Spezifikation kennt sie seit 2025-06-18 nicht
+ * mehr, und ein Batch würde die Bremse mit bis zu 100 Aufrufen je Anfrage umgehen. Der User-Agent wird nur als grobes Band
+ * (zaehler.ts) an die Zählung gegeben, nie gespeichert. Solange der Server lauscht, läuft der Wächter gegen Hänger (waechter.ts).
  */
 import { createServer, type IncomingMessage, type Server as HttpServer, type ServerResponse } from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { bremse as neueBremse, type Bremse } from "./bremse";
 import { mcpServer, VERSION } from "./server";
+import { waechter } from "./waechter";
 import { WERKZEUGE } from "./werkzeuge";
+import { clientBand, mitClient } from "./zaehler";
 
 export const MAX_BYTES = 32 * 1024;
 const LOKAL = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
@@ -47,9 +52,10 @@ function lesen(req: IncomingMessage): Promise<string | null> {
   });
 }
 
-export function httpServer(o: { bremse?: Bremse } = {}): HttpServer {
+/** waechterMs: Hänger-Grenze in Millisekunden, 0 schaltet den Wächter ab. */
+export function httpServer(o: { bremse?: Bremse; waechterMs?: number } = {}): HttpServer {
   const darf = o.bremse ?? neueBremse();
-  return createServer(async (req, res) => {
+  const s = createServer(async (req, res) => {
     const pfad = (req.url ?? "/").split("?")[0];
     try {
       if (req.method === "OPTIONS") return senden(res, 204, "");
@@ -68,12 +74,13 @@ export function httpServer(o: { bremse?: Bremse } = {}): HttpServer {
       if (roh === null) return senden(res, 413, { error: "payload_too_large" });
       let body: unknown;
       try { body = JSON.parse(roh); } catch { return senden(res, 400, { jsonrpc: "2.0", error: { code: -32700, message: "Parse error" }, id: null }); }
+      if (Array.isArray(body)) return senden(res, 400, { jsonrpc: "2.0", error: { code: -32600, message: "Batch requests are not supported, send one JSON-RPC message per request." }, id: null });
       for (const [k, v] of Object.entries(CORS)) res.setHeader(k, v);
       const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
       const server = mcpServer();
       res.on("close", () => { void transport.close(); void server.close(); });
       await server.connect(transport);
-      await transport.handleRequest(req, res, body);
+      await mitClient(clientBand(req.headers["user-agent"]), () => transport.handleRequest(req, res, body));
     } catch (err) {
       // Nur die Art des Fehlers, nie die Anfrage.
       console.error("Fehler", err instanceof Error ? err.name : "unbekannt");
@@ -81,4 +88,11 @@ export function httpServer(o: { bremse?: Bremse } = {}): HttpServer {
       else res.end();
     }
   });
+  const grenze = o.waechterMs ?? 30_000;
+  if (grenze > 0) {
+    let stopp: (() => void) | undefined;
+    s.on("listening", () => { stopp ??= waechter(grenze); });
+    s.on("close", () => { stopp?.(); stopp = undefined; });
+  }
+  return s;
 }
