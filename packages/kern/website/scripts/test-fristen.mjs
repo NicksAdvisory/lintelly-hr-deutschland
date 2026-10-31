@@ -142,4 +142,32 @@ t("Feiertage: Ostern 2027 = 28.03., Karfreitag 26.03., Pfingstmontag 17.05.2027,
   assert.equal(F.bundesFeiertag("2027-03-26"), "Karfreitag"); assert.equal(F.bundesFeiertag("2027-05-17"), "Pfingstmontag");
   assert.equal(F.bundesFeiertag("2026-10-05"), null);
 });
+
+// Tabelle "Kündigung zum 31.12.2026" auf /tools/kuendigungsfrist-rechner: jede Zeile muss mit dem Rechner übereinstimmen
+const { TOOLS_1 } = await import("../lib/tools/batch-1.ts");
+const tab = TOOLS_1.find((x) => x.slug === "kuendigungsfrist-rechner").inhalt.find((a) => a.h.startsWith("Kündigung zum 31.12.2026")).tabelle;
+const eingabe = {
+  "Probezeit": { eintritt: "2026-07-01", probezeitMonate: 6 },
+  "unter 2 Jahren": { eintritt: "2025-04-01" },
+  "ab 2 Jahren": { eintritt: "2023-04-01" },
+  "ab 5 Jahren": { eintritt: "2020-04-01" },
+  "ab 8 Jahren": { eintritt: "2017-04-01" },
+  "ab 10 Jahren": { eintritt: "2015-04-01" },
+  "ab 12 Jahren": { eintritt: "2013-04-01" },
+  "ab 15 Jahren": { eintritt: "2010-04-01" },
+  "ab 20 Jahren": { eintritt: "2005-04-01" },
+  "Kündigung durch Beschäftigte": { eintritt: "2012-04-01", kuendigender: "arbeitnehmer" },
+};
+const iso = (de) => de.slice(6, 10) + "-" + de.slice(3, 5) + "-" + de.slice(0, 2);
+const plus1 = (d) => new Date(Date.parse(d) + 864e5).toISOString().slice(0, 10);
+t("Tabelle 31.12.2026: späteste Zugangstage stimmen mit dem Rechner", () => {
+  assert.equal(tab.zeilen.length, Object.keys(eingabe).length);
+  for (const [stufe, , zugangDe] of tab.zeilen) {
+    const e = Object.entries(eingabe).find(([s]) => stufe.startsWith(s))?.[1];
+    assert.ok(e, `keine Eingabe für Zeile ${stufe}`);
+    const zugang = iso(zugangDe);
+    assert.equal(k({ ...e, zugang }).ende, "2026-12-31", `${stufe}: Zugang ${zugang}`);
+    assert.ok(k({ ...e, zugang: plus1(zugang) }).ende > "2026-12-31", `${stufe}: ein Tag später reicht noch`);
+  }
+});
 console.log(`\n${n} Tests bestanden.`);
