@@ -2,6 +2,10 @@
 
 Versionen nach SemVer. Jede Version geht über die Release-Pipeline auf npm, ghcr.io und hr.lintelly.com.
 
+## 0.3.1
+
+- Abgleich mit Werkbank und lintelly.com: website/scripts/test-fristen.mjs werkbank/lib/regeln/register.ts werkbank/lib/regeln/werte.ts
+
 ## 0.3.0
 
 ### Kern auf Stand 29.10.2026 (Werkbank main, lintelly.com main)
